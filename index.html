@@ -774,6 +774,10 @@ function rebuildTable(){
   const tbl=document.getElementById('timetable');
   tbl.innerHTML='';
 
+  // Keep classes ordered by year then name so newly added classes
+  // appear grouped with their year instead of at the far right end.
+  CLASSES.sort((a,b)=> a.year-b.year || a.name.localeCompare(b.name));
+
   // ---- HEADER ROW: corner + class columns ----
   const thead=tbl.createTHead();
   const hrow=thead.insertRow();
