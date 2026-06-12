@@ -336,6 +336,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="data.js"></script>
 </head>
 <body>
@@ -347,6 +348,18 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
       <div class="logo-text">SNU TIMETABLE</div>
       <div class="logo-sub">ຕາຕະລາງການຮຽນ-ການສອນ<br>ຄະນະວິສະວະກຳສາດ ມ.ສ ສຸພານຸວົງ</div>
     </div>
+    <button class="login-btn" style="display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#222;box-shadow:0 4px 18px rgba(0,0,0,.3)" onclick="loginWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      ເຂົ້າສູ່ລະບົບ admin ດ້ວຍ Google
+    </button>
+    <div class="login-err" id="loginErr"></div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:18px 0 14px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:11px;color:var(--text-muted)">ຫຼື ເຂົ້າເບິ່ງ (ຜູ້ເບິ່ງ)</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
     <div class="form-field">
       <label>ຊື່ຜູ້ໃຊ້</label>
       <input type="text" id="uname" placeholder="ປ້ອນຊື່ຜູ້ໃຊ້" autocomplete="off">
@@ -355,13 +368,12 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
       <label>ລະຫັດຜ່ານ</label>
       <input type="password" id="upass" placeholder="ປ້ອນລະຫັດຜ່ານ">
     </div>
-    <button class="login-btn" onclick="doLogin()">ເຂົ້າສູ່ລະບົບ</button>
-    <div class="login-err" id="loginErr"></div>
+    <button class="login-btn" style="background:var(--panel);color:var(--text);box-shadow:none;border:1px solid var(--border)" onclick="doLogin()">ເຂົ້າເບິ່ງ</button>
     <div class="hint-block">
-      <strong>🔑 ບັນຊີທົດສອບ:</strong><br>
-      admin / admin123 → ຜູ້ດູແລລະບົບ<br>
+      <strong>👁 ບັນຊີຜູ້ເບິ່ງ (ເບິ່ງຢ່າງດຽວ):</strong><br>
       teacher / teacher123 → ຄູສອນ<br>
-      student / student123 → ນັກສຶກສາ
+      student / student123 → ນັກສຶກສາ<br>
+      <span style="color:var(--accent)">ການແກ້ໄຂ → ໃຊ້ "ເຂົ້າສູ່ລະບົບ admin ດ້ວຍ Google"</span>
     </div>
   </div>
 </div>
@@ -552,8 +564,8 @@ const COLORS = [
   '#facc15','#60a5fa','#4ade80','#f87171','#34e8c8'
 ];
 
+// ບັນຊີຜູ້ເບິ່ງ (read-only). admin ໃຊ້ Google login ແທນ.
 const USERS = {
-  admin:   {pass:'admin123',   role:'admin',   label:'ຜູ້ດູແລລະບົບ'},
   teacher: {pass:'teacher123', role:'teacher', label:'ຄູສອນ'},
   student: {pass:'student123', role:'student', label:'ນັກສຶກສາ'},
 };
@@ -583,12 +595,13 @@ let pickedColor = COLORS[0];
 let activeCell  = null;
 
 // ============================================================
-// SUPABASE — ບ່ອນເກັບຂໍ້ມູນກາງ (admin ແກ້ → ທຸກຄົນເຫັນ)
+// SUPABASE — ບ່ອນເກັບຂໍ້ມູນກາງ + Auth (Google)
+// admin login ດ້ວຍ Google; ສິດ write ກວດດ້ວຍ allowlist ຝັ່ງ server (RLS).
+// ບໍ່ມີລະຫັດ admin ໃນ code client ເລີຍ.
 // ============================================================
 const SUPA_URL  = 'https://zyofznchnzhqaazfvutv.supabase.co';
 const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5b2Z6bmNobnpocWFhemZ2dXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyODQ5OTQsImV4cCI6MjA5Njg2MDk5NH0.Pyh1dYPPIlAVE3glpGsVa5DnBTjBACTjARv3eBR0k7E';
-// ຕ້ອງກົງກັບ ADMIN_WRITE_PASSWORD ໃນ Edge Function save-timetable
-const SUPA_WRITE_PASSWORD = 'admin123';
+const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
 let _pushTimer = null;
 let _pollTimer = null;
 
@@ -599,16 +612,12 @@ function setSyncStatus(text, color){
   el.style.color=color||'var(--text-muted)';
 }
 
-// ໂຫລດຕາຕະລາງລວມຈາກ server (ທຸກຄົນເຫັນຂໍ້ມູນດຽວກັນ)
+// ໂຫລດຕາຕະລາງລວມຈາກ server (ທຸກຄົນເຫັນຂໍ້ມູນດຽວກັນ) — public read
 async function syncFromServer(){
   try{
     setSyncStatus('☁️ ກຳລັງໂຫລດ…','var(--text-muted)');
-    const res=await fetch(`${SUPA_URL}/rest/v1/timetable?id=eq.1&select=data,version`,{
-      headers:{ apikey:SUPA_ANON, Authorization:'Bearer '+SUPA_ANON }
-    });
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const rows=await res.json();
-    const row=rows&&rows[0];
+    const { data:row, error } = await sb.from('timetable').select('data,version').eq('id',1).single();
+    if(error) throw error;
     if(row&&row.data){
       const d=row.data;
       if(Array.isArray(d.subjects)) subjects=d.subjects.map(s=>({...s}));
@@ -624,22 +633,23 @@ async function syncFromServer(){
   }
 }
 
-// ບັນທຶກຕາຕະລາງຂຶ້ນ server (admin ເທົ່ານັ້ນ) — ຜ່ານ Edge Function
+// ບັນທຶກຕາຕະລາງຂຶ້ນ server — ໃຊ້ session ຂອງ admin (RLS ກວດ allowlist)
 async function pushToServer(){
   if(currentRole!=='admin') return;
   try{
     setSyncStatus('☁️ ກຳລັງບັນທຶກ…','var(--text-muted)');
-    const res=await fetch(`${SUPA_URL}/functions/v1/save-timetable`,{
-      method:'POST',
-      headers:{ apikey:SUPA_ANON, Authorization:'Bearer '+SUPA_ANON, 'Content-Type':'application/json' },
-      body:JSON.stringify({ password:SUPA_WRITE_PASSWORD, data:{ subjects, schedule, classes:CLASSES } })
-    });
-    const out=await res.json().catch(()=>({}));
-    if(!res.ok) throw new Error(out.error||('HTTP '+res.status));
-    if(out.version) localStorage.setItem('snu_dataVersion', String(out.version));
+    const { data:cur } = await sb.from('timetable').select('version').eq('id',1).single();
+    const newVersion = ((cur&&cur.version)||0)+1;
+    const { error } = await sb.from('timetable').update({
+      data:{ subjects, schedule, classes:CLASSES },
+      version:newVersion,
+      updated_at:new Date().toISOString()
+    }).eq('id',1);
+    if(error) throw error;
+    localStorage.setItem('snu_dataVersion', String(newVersion));
     setSyncStatus('☁️ ບັນທຶກແລ້ວ · ທຸກຄົນເຫັນ','var(--accent3)');
   }catch(e){
-    setSyncStatus('⚠️ ບັນທຶກບໍ່ສຳເລັດ','var(--accent2)');
+    setSyncStatus('⚠️ ບັນທຶກບໍ່ສຳເລັດ: '+(e.message||e),'var(--accent2)');
   }
 }
 
@@ -650,9 +660,69 @@ function schedulePush(){
   _pushTimer=setTimeout(pushToServer, 700);
 }
 
+// ----- AUTH (Google) -----
+async function loginWithGoogle(){
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo } });
+  if(error){ document.getElementById('loginErr').textContent='❌ Google login error: '+error.message; }
+}
+
+// ຫຼັງ login ດ້ວຍ Google — ກວດ allowlist ຜ່ານ RPC is_admin()
+async function enterWithSession(session){
+  try{
+    const { data:isAdmin } = await sb.rpc('is_admin');
+    const email = (session && session.user && session.user.email) || '';
+    if(isAdmin===true){
+      startApp('admin', '👑 '+email);
+    } else {
+      startApp('student', '🎓 ຜູ້ເບິ່ງ');
+      setTimeout(()=>alert('ບັນຊີ Google ນີ້ ('+email+') ບໍ່ມີສິດ admin.\nເຂົ້າເບິ່ງແບບຜູ້ເບິ່ງ. ຖ້າຕ້ອງການສິດ admin ໃຫ້ເພີ່ມ email ນີ້ໃນ allowlist.'),300);
+    }
+  }catch(e){
+    startApp('student', '🎓 ຜູ້ເບິ່ງ');
+  }
+}
+
+// ກວດ session ຕອນໂຫລດໜ້າ / ກັບມາຈາກ Google
+async function initAuth(){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session) await enterWithSession(session);
+  }catch(e){}
+}
+
 // ============================================================
 // LOGIN
 // ============================================================
+// ເຂົ້າແອັບ (ໃຊ້ຮ່ວມກັນລະຫວ່າງ admin-Google ແລະ ຜູ້ເບິ່ງ)
+function startApp(role, chipLabel){
+  currentRole = role;
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  const chip = document.getElementById('userChip');
+  chip.className = 'user-chip '+role;
+  chip.textContent = chipLabel;
+  if(role==='admin'){
+    document.getElementById('adminSide').style.display='';
+    document.getElementById('viewSide').style.display='none';
+  } else {
+    document.getElementById('adminSide').style.display='none';
+    document.getElementById('viewSide').style.display='';
+    document.getElementById('roleLabel').textContent=chipLabel;
+  }
+  loadData();
+  buildColorGrid();
+  rebuildTable();
+  renderSubjectList();
+  renderClassList();
+  // ໂຫລດຂໍ້ມູນລວມຈາກ server
+  syncFromServer();
+  // ຜູ້ເບິ່ງ (ບໍ່ແມ່ນ admin) ດຶງຂໍ້ມູນໃໝ່ທຸກ 45 ວິນາທີ ໂດຍບໍ່ຕ້ອງ refresh
+  clearInterval(_pollTimer);
+  if(role!=='admin') _pollTimer=setInterval(syncFromServer, 45000);
+}
+
+// ຜູ້ເບິ່ງ (teacher/student) — username/password ທ້ອງຖິ່ນ, read-only
 function doLogin(){
   const u = document.getElementById('uname').value.trim();
   const p = document.getElementById('upass').value;
@@ -661,33 +731,11 @@ function doLogin(){
     document.getElementById('loginErr').textContent='❌ ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ';
     return;
   }
-  currentRole = user.role;
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('app').style.display='flex';
-  const chip = document.getElementById('userChip');
-  chip.className = 'user-chip '+currentRole;
-  const icons={admin:'👑',teacher:'👨‍🏫',student:'🎓'};
-  chip.textContent = icons[currentRole]+' '+user.label;
-  if(currentRole==='admin'){
-    document.getElementById('adminSide').style.display='';
-    document.getElementById('viewSide').style.display='none';
-  } else {
-    document.getElementById('adminSide').style.display='none';
-    document.getElementById('viewSide').style.display='';
-    document.getElementById('roleLabel').textContent=user.label;
-  }
-  loadData();
-  buildColorGrid();
-  rebuildTable();
-  renderSubjectList();
-  renderClassList();
-  // ໂຫລດຂໍ້ມູນລວມຈາກ server (override ຂໍ້ມູນເຄື່ອງ ຖ້າເຊື່ອມຕໍ່ໄດ້)
-  syncFromServer();
-  // ຜູ້ເບິ່ງ (ບໍ່ແມ່ນ admin) ດຶງຂໍ້ມູນໃໝ່ທຸກ 45 ວິນາທີ ໂດຍບໍ່ຕ້ອງ refresh
-  clearInterval(_pollTimer);
-  if(currentRole!=='admin') _pollTimer=setInterval(syncFromServer, 45000);
+  const icons={teacher:'👨‍🏫',student:'🎓'};
+  startApp(user.role, (icons[user.role]||'🎓')+' '+user.label);
 }
-function doLogout(){
+async function doLogout(){
+  if(currentRole==='admin'){ try{ await sb.auth.signOut(); }catch(e){} }
   currentRole='';
   clearInterval(_pollTimer);
   document.getElementById('loginScreen').style.display='flex';
@@ -1282,6 +1330,9 @@ function saveAsPDF(){
     alert('ເກີດຂໍ້ຜິດພາດໃນການສ້າງ PDF: '+(err && err.message ? err.message : err));
   });
 }
+
+// ກວດ session ຕອນເປີດໜ້າ (ຮອງຮັບການກັບມາຈາກ Google OAuth)
+initAuth();
 </script>
 </body>
 </html>
