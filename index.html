@@ -396,6 +396,15 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
       <!-- Admin -->
       <div id="adminSide">
         <div>
+          <div class="section-lbl">📅 ສົກຮຽນ / ພາກຮຽນ</div>
+          <div class="field-row">
+            <label>ຂໍ້ຄວາມສະແດງ (ເຊັ່ນ ພາກຮຽນທີ II · 2025-2026)</label>
+            <input type="text" id="semInput" placeholder="ພາກຮຽນທີ II · 2025-2026">
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveSemester()">💾 ບັນທຶກສົກຮຽນ</button>
+        </div>
+        <hr>
+        <div>
           <div class="section-lbl">📚 ເພີ່ມວິຊາ</div>
           <div class="field-row">
             <label>ລະຫັດ (ເຊັ່ນ 528 1206)</label>
@@ -470,7 +479,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
           <div class="school-title">ຄະນະວິສະວະກຳສາດ ມ.ສ ສຸພານຸວົງ</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">ຕາຕະລາງການຮຽນ-ການສອນ ປີ 1, 2, 3 ແລະ 4</div>
         </div>
-        <div class="semester-badge">ພາກຮຽນທີ II · 2025-2026</div>
+        <div class="semester-badge" id="semesterBadge">ພາກຮຽນທີ II · 2025-2026</div>
         <div style="flex:1"></div>
         <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 ພິມ</button>
         <button class="btn btn-primary btn-sm" onclick="saveAsPDF()">📄 PDF</button>
@@ -591,8 +600,25 @@ const WED_LABOR_TIME = {start:'13:00', end:'15:30'};
 let currentRole = '';
 let subjects    = [];
 let schedule    = {}; // key: "dayKey-classId-periodIndex" => subjectId
+let schoolMeta  = { semester: 'ພາກຮຽນທີ II · 2025-2026' }; // ສົກຮຽນ/ພາກຮຽນ (ແກ້ໄຂໄດ້)
 let pickedColor = COLORS[0];
 let activeCell  = null;
+
+// ສະແດງສົກຮຽນ/ພາກຮຽນ ໃນ badge + header + ຊ່ອງ input ຂອງ admin
+function renderMeta(){
+  const txt = (schoolMeta && schoolMeta.semester) || '';
+  const badge = document.getElementById('semesterBadge'); if(badge) badge.textContent = txt;
+  const sem = document.getElementById('semLabel'); if(sem) sem.textContent = txt;
+  const inp = document.getElementById('semInput'); if(inp && document.activeElement!==inp) inp.value = txt;
+}
+// admin ບັນທຶກສົກຮຽນ → sync ຂຶ້ນ server
+function saveSemester(){
+  if(currentRole!=='admin') return;
+  const inp = document.getElementById('semInput');
+  schoolMeta = { semester: (inp.value||'').trim() };
+  renderMeta();
+  saveData();
+}
 
 // ============================================================
 // SUPABASE — ບ່ອນເກັບຂໍ້ມູນກາງ + Auth (Google)
@@ -623,9 +649,10 @@ async function syncFromServer(){
       if(Array.isArray(d.subjects)) subjects=d.subjects.map(s=>({...s}));
       if(d.schedule&&typeof d.schedule==='object') schedule={...d.schedule};
       if(Array.isArray(d.classes))  CLASSES=d.classes.map(c=>({...c}));
+      if(d.meta&&typeof d.meta==='object') schoolMeta={...d.meta};
       localStorage.setItem('snu_dataVersion', String(row.version||0));
       saveLocal();
-      buildColorGrid(); rebuildTable(); renderSubjectList(); renderClassList();
+      buildColorGrid(); rebuildTable(); renderSubjectList(); renderClassList(); renderMeta();
     }
     setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
@@ -641,7 +668,7 @@ async function pushToServer(){
     const { data:cur } = await sb.from('timetable').select('version').eq('id',1).single();
     const newVersion = ((cur&&cur.version)||0)+1;
     const { error } = await sb.from('timetable').update({
-      data:{ subjects, schedule, classes:CLASSES },
+      data:{ subjects, schedule, classes:CLASSES, meta:schoolMeta },
       version:newVersion,
       updated_at:new Date().toISOString()
     }).eq('id',1);
@@ -715,6 +742,7 @@ function startApp(role, chipLabel){
   rebuildTable();
   renderSubjectList();
   renderClassList();
+  renderMeta();
   // ໂຫລດຂໍ້ມູນລວມຈາກ server
   syncFromServer();
   // ຜູ້ເບິ່ງ (ບໍ່ແມ່ນ admin) ດຶງຂໍ້ມູນໃໝ່ທຸກ 45 ວິນາທີ ໂດຍບໍ່ຕ້ອງ refresh
@@ -1212,6 +1240,7 @@ function saveLocal(){
     localStorage.setItem('snu_subjects', JSON.stringify(subjects));
     localStorage.setItem('snu_schedule', JSON.stringify(schedule));
     localStorage.setItem('snu_classes',  JSON.stringify(CLASSES));
+    localStorage.setItem('snu_meta',     JSON.stringify(schoolMeta));
   }catch(e){}
 }
 // ບັນທຶກລົງເຄື່ອງ + ດັນຂຶ້ນ server (admin) ໃຫ້ທຸກຄົນເຫັນ
@@ -1232,6 +1261,7 @@ function loadData(){
       if(seed.subjects) subjects = seed.subjects.map(s=>({...s}));
       if(seed.schedule) schedule = {...seed.schedule};
       if(seed.classes)  CLASSES  = seed.classes.map(c=>({...c}));
+      if(seed.meta)     schoolMeta = {...seed.meta};
       localStorage.setItem('snu_dataVersion', String(seedVer));
       saveLocal();
       return;
@@ -1239,6 +1269,7 @@ function loadData(){
     const subs=localStorage.getItem('snu_subjects'); if(subs) subjects=JSON.parse(subs);
     const sch=localStorage.getItem('snu_schedule');  if(sch)  schedule=JSON.parse(sch);
     const cls=localStorage.getItem('snu_classes');   if(cls)  CLASSES=JSON.parse(cls);
+    const mta=localStorage.getItem('snu_meta');      if(mta)  schoolMeta=JSON.parse(mta);
   }catch(e){}
 }
 
@@ -1247,7 +1278,7 @@ function loadData(){
 // ============================================================
 function exportJSON(){
   saveData();
-  const blob=new Blob([JSON.stringify({subjects,schedule,classes:CLASSES},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({subjects,schedule,classes:CLASSES,meta:schoolMeta},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='timetable-snu.json';a.click();
 }
 function importClick(){document.getElementById('importFile').click();}
@@ -1260,7 +1291,8 @@ function importJSON(e){
       if(data.subjects) subjects=data.subjects;
       if(data.schedule) schedule=data.schedule;
       if(data.classes)  CLASSES=data.classes;
-      renderSubjectList(); renderClassList(); rebuildTable(); saveData();
+      if(data.meta)     schoolMeta=data.meta;
+      renderSubjectList(); renderClassList(); rebuildTable(); renderMeta(); saveData();
       alert('ນຳເຂົ້າສຳເລັດ!');
     }catch{alert('ໄຟລ໌ JSON ບໍ່ຖືກຕ້ອງ');}
   };
@@ -1292,7 +1324,7 @@ function saveAsPDF(){
   title.style.marginBottom='12px';
   title.innerHTML=`
     <div style="font-size:18px;font-weight:700;">ຄະນະວິສະວະກຳສາດ ມ.ສ ສຸພານຸວົງ</div>
-    <div style="font-size:12px;color:#555;margin-top:2px;">ຕາຕະລາງການຮຽນ-ການສອນ ປີ 1, 2, 3 ແລະ 4 · ພາກຮຽນທີ II · 2025-2026</div>
+    <div style="font-size:12px;color:#555;margin-top:2px;">ຕາຕະລາງການຮຽນ-ການສອນ ປີ 1, 2, 3 ແລະ 4 · ${(schoolMeta&&schoolMeta.semester)||''}</div>
   `;
   wrapper.appendChild(title);
 
