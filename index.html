@@ -448,6 +448,10 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
             <label>ຊື່ສາຂາ (2 ແຖວ)</label>
             <input type="text" id="classLabel" placeholder="ປັນຍາ ປະດິດ">
           </div>
+          <div class="field-row">
+            <label>ສີສາຂາ</label>
+            <div class="color-grid" id="classColorGrid"></div>
+          </div>
           <button class="btn btn-primary" id="classFormBtn" style="width:100%;margin-top:4px" onclick="addOrUpdateClass()">+ ເພີ່ມຊັ້ນປີ/ສາຂາ</button>
           <div id="classFormCancelWrap" style="display:none;margin-top:6px">
             <button class="btn btn-ghost" style="width:100%" onclick="cancelEditClass()">ຍົກເລີກການແກ້ໄຂ</button>
@@ -739,6 +743,7 @@ function startApp(role, chipLabel){
   }
   loadData();
   buildColorGrid();
+  buildClassColorGrid();
   rebuildTable();
   renderSubjectList();
   renderClassList();
@@ -784,7 +789,22 @@ function buildColorGrid(){
     const el=document.createElement('div');
     el.className='cswatch'+(c===pickedColor?' active':'');
     el.style.background=c;
-    el.onclick=()=>{pickedColor=c;document.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');};
+    el.onclick=()=>{pickedColor=c;grid.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');};
+    grid.appendChild(el);
+  });
+}
+
+// ສີສຳລັບສາຂາ (ໃຊ້ຄູ່ bg+text ຈາກ CLASS_COLOR_PALETTE)
+let pickedClassColor = CLASS_COLOR_PALETTE[0];
+function buildClassColorGrid(){
+  const grid=document.getElementById('classColorGrid');
+  if(!grid) return;
+  grid.innerHTML='';
+  CLASS_COLOR_PALETTE.forEach(pair=>{
+    const el=document.createElement('div');
+    el.className='cswatch'+(pair.tc===pickedClassColor.tc?' active':'');
+    el.style.background=pair.tc;
+    el.onclick=()=>{pickedClassColor=pair;grid.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');};
     grid.appendChild(el);
   });
 }
@@ -833,10 +853,6 @@ function renderSubjectList(){
 // ============================================================
 let editingClassId = null;
 
-function classColorFor(idx){
-  return CLASS_COLOR_PALETTE[idx % CLASS_COLOR_PALETTE.length];
-}
-
 function addOrUpdateClass(){
   const year = parseInt(document.getElementById('classYear').value);
   const code = document.getElementById('classCode').value.trim().toUpperCase();
@@ -855,7 +871,7 @@ function addOrUpdateClass(){
       alert('ມີຊັ້ນປີ/ສາຂານີ້ຢູ່ແລ້ວ'); return;
     }
     const oldId = CLASSES[idx].id;
-    CLASSES[idx] = { ...CLASSES[idx], id, year, name:code, label };
+    CLASSES[idx] = { ...CLASSES[idx], id, year, name:code, label, color:pickedClassColor.color, tc:pickedClassColor.tc };
     // Update schedule keys if id changed
     if(oldId!==id){
       const newSchedule={};
@@ -871,12 +887,13 @@ function addOrUpdateClass(){
   } else {
     // Adding new class
     if(CLASSES.some(c=>c.id===id)){ alert('ມີຊັ້ນປີ/ສາຂານີ້ຢູ່ແລ້ວ'); return; }
-    const palette = classColorFor(CLASSES.length);
-    CLASSES.push({ id, year, name:code, label, color:palette.color, tc:palette.tc });
+    CLASSES.push({ id, year, name:code, label, color:pickedClassColor.color, tc:pickedClassColor.tc });
   }
 
   document.getElementById('classCode').value='';
   document.getElementById('classLabel').value='';
+  pickedClassColor = CLASS_COLOR_PALETTE[0];
+  buildClassColorGrid();
   renderClassList();
   rebuildTable();
   saveData();
@@ -889,6 +906,8 @@ function editClass(id){
   document.getElementById('classYear').value = cls.year;
   document.getElementById('classCode').value = cls.name;
   document.getElementById('classLabel').value = cls.label.replace(/\n/g,' ');
+  pickedClassColor = { color: cls.color, tc: cls.tc };
+  buildClassColorGrid();
   document.getElementById('classFormBtn').textContent = '✓ ບັນທຶກການແກ້ໄຂ';
   document.getElementById('classFormCancelWrap').style.display = '';
 }
@@ -897,6 +916,8 @@ function cancelEditClass(){
   editingClassId = null;
   document.getElementById('classCode').value='';
   document.getElementById('classLabel').value='';
+  pickedClassColor = CLASS_COLOR_PALETTE[0];
+  buildClassColorGrid();
   document.getElementById('classFormBtn').textContent = '+ ເພີ່ມຊັ້ນປີ/ສາຂາ';
   document.getElementById('classFormCancelWrap').style.display = 'none';
 }
