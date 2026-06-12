@@ -372,6 +372,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
     <div class="hd-logo">SNU · TT</div>
     <div class="hd-center" id="semLabel"></div>
     <div class="hd-right">
+      <span id="syncStatus" style="font-size:11px;font-weight:600"></span>
       <div class="user-chip" id="userChip"></div>
       <button class="btn btn-logout" onclick="doLogout()">ອອກ</button>
     </div>
@@ -582,6 +583,74 @@ let pickedColor = COLORS[0];
 let activeCell  = null;
 
 // ============================================================
+// SUPABASE — ບ່ອນເກັບຂໍ້ມູນກາງ (admin ແກ້ → ທຸກຄົນເຫັນ)
+// ============================================================
+const SUPA_URL  = 'https://zyofznchnzhqaazfvutv.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5b2Z6bmNobnpocWFhemZ2dXR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyODQ5OTQsImV4cCI6MjA5Njg2MDk5NH0.Pyh1dYPPIlAVE3glpGsVa5DnBTjBACTjARv3eBR0k7E';
+// ຕ້ອງກົງກັບ ADMIN_WRITE_PASSWORD ໃນ Edge Function save-timetable
+const SUPA_WRITE_PASSWORD = 'admin123';
+let _pushTimer = null;
+let _pollTimer = null;
+
+function setSyncStatus(text, color){
+  const el=document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent=text;
+  el.style.color=color||'var(--text-muted)';
+}
+
+// ໂຫລດຕາຕະລາງລວມຈາກ server (ທຸກຄົນເຫັນຂໍ້ມູນດຽວກັນ)
+async function syncFromServer(){
+  try{
+    setSyncStatus('☁️ ກຳລັງໂຫລດ…','var(--text-muted)');
+    const res=await fetch(`${SUPA_URL}/rest/v1/timetable?id=eq.1&select=data,version`,{
+      headers:{ apikey:SUPA_ANON, Authorization:'Bearer '+SUPA_ANON }
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const rows=await res.json();
+    const row=rows&&rows[0];
+    if(row&&row.data){
+      const d=row.data;
+      if(Array.isArray(d.subjects)) subjects=d.subjects.map(s=>({...s}));
+      if(d.schedule&&typeof d.schedule==='object') schedule={...d.schedule};
+      if(Array.isArray(d.classes))  CLASSES=d.classes.map(c=>({...c}));
+      localStorage.setItem('snu_dataVersion', String(row.version||0));
+      saveLocal();
+      buildColorGrid(); rebuildTable(); renderSubjectList(); renderClassList();
+    }
+    setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
+  }catch(e){
+    setSyncStatus('⚠️ ອອບລາຍ (ໃຊ້ຂໍ້ມູນເຄື່ອງ)','var(--accent2)');
+  }
+}
+
+// ບັນທຶກຕາຕະລາງຂຶ້ນ server (admin ເທົ່ານັ້ນ) — ຜ່ານ Edge Function
+async function pushToServer(){
+  if(currentRole!=='admin') return;
+  try{
+    setSyncStatus('☁️ ກຳລັງບັນທຶກ…','var(--text-muted)');
+    const res=await fetch(`${SUPA_URL}/functions/v1/save-timetable`,{
+      method:'POST',
+      headers:{ apikey:SUPA_ANON, Authorization:'Bearer '+SUPA_ANON, 'Content-Type':'application/json' },
+      body:JSON.stringify({ password:SUPA_WRITE_PASSWORD, data:{ subjects, schedule, classes:CLASSES } })
+    });
+    const out=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(out.error||('HTTP '+res.status));
+    if(out.version) localStorage.setItem('snu_dataVersion', String(out.version));
+    setSyncStatus('☁️ ບັນທຶກແລ້ວ · ທຸກຄົນເຫັນ','var(--accent3)');
+  }catch(e){
+    setSyncStatus('⚠️ ບັນທຶກບໍ່ສຳເລັດ','var(--accent2)');
+  }
+}
+
+// debounce: ລວມການແກ້ໄຂຫຼາຍຄັ້ງເປັນການບັນທຶກເທື່ອດຽວ
+function schedulePush(){
+  if(currentRole!=='admin') return;
+  clearTimeout(_pushTimer);
+  _pushTimer=setTimeout(pushToServer, 700);
+}
+
+// ============================================================
 // LOGIN
 // ============================================================
 function doLogin(){
@@ -612,9 +681,15 @@ function doLogin(){
   rebuildTable();
   renderSubjectList();
   renderClassList();
+  // ໂຫລດຂໍ້ມູນລວມຈາກ server (override ຂໍ້ມູນເຄື່ອງ ຖ້າເຊື່ອມຕໍ່ໄດ້)
+  syncFromServer();
+  // ຜູ້ເບິ່ງ (ບໍ່ແມ່ນ admin) ດຶງຂໍ້ມູນໃໝ່ທຸກ 45 ວິນາທີ ໂດຍບໍ່ຕ້ອງ refresh
+  clearInterval(_pollTimer);
+  if(currentRole!=='admin') _pollTimer=setInterval(syncFromServer, 45000);
 }
 function doLogout(){
   currentRole='';
+  clearInterval(_pollTimer);
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('app').style.display='none';
   document.getElementById('uname').value='';
@@ -1084,12 +1159,17 @@ function clearAll(){
 // ============================================================
 // SAVE / LOAD
 // ============================================================
-function saveData(){
+function saveLocal(){
   try{
     localStorage.setItem('snu_subjects', JSON.stringify(subjects));
     localStorage.setItem('snu_schedule', JSON.stringify(schedule));
     localStorage.setItem('snu_classes',  JSON.stringify(CLASSES));
   }catch(e){}
+}
+// ບັນທຶກລົງເຄື່ອງ + ດັນຂຶ້ນ server (admin) ໃຫ້ທຸກຄົນເຫັນ
+function saveData(){
+  saveLocal();
+  schedulePush();
 }
 function loadData(){
   try{
@@ -1105,7 +1185,7 @@ function loadData(){
       if(seed.schedule) schedule = {...seed.schedule};
       if(seed.classes)  CLASSES  = seed.classes.map(c=>({...c}));
       localStorage.setItem('snu_dataVersion', String(seedVer));
-      saveData();
+      saveLocal();
       return;
     }
     const subs=localStorage.getItem('snu_subjects'); if(subs) subjects=JSON.parse(subs);
