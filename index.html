@@ -150,15 +150,30 @@ table{border-collapse:collapse;background:var(--surface);}
   border-bottom:2px solid var(--border);
 }
 
+/* Year group header row (top) */
+.year-group-th{
+  background:var(--panel);
+  position:sticky;top:0;
+  z-index:25;
+  height:30px;
+  text-align:center;
+  font-size:13px;font-weight:700;letter-spacing:1px;
+  border-bottom:1px solid var(--border);
+  border-right:2px solid var(--border);
+}
+
 /* Class header row */
 .class-header-row th{
   background:var(--panel);
-  position:sticky;top:0;
+  position:sticky;top:30px;
   z-index:20;
   padding:0;
   border-bottom:2px solid var(--border);
   border-right:1px solid var(--border);
 }
+/* Thicker separator at the end of each year group */
+.class-header-row th.year-end{border-right:2px solid var(--accent);}
+td.slot.year-end{border-right:2px solid var(--accent);}
 .class-th{
   min-width:130px;width:130px;
   padding:0;
@@ -247,7 +262,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
   .tt-area{padding:0;}
   .tt-scroll{border:none;overflow:visible;}
   table{border:1px solid #999;width:100%;}
-  .class-header-row th,.corner-cell,.day-time-cell,.day-group-header{background:#f0f0f0!important;color:#111!important;-webkit-print-color-adjust:exact;}
+  .class-header-row th,.corner-cell,.day-time-cell,.day-group-header,.year-group-th{background:#f0f0f0!important;color:#111!important;-webkit-print-color-adjust:exact;}
   td.slot{min-width:80px;width:auto;}
   .slot-inner{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 }
@@ -778,30 +793,47 @@ function rebuildTable(){
   // appear grouped with their year instead of at the far right end.
   CLASSES.sort((a,b)=> a.year-b.year || a.name.localeCompare(b.name));
 
-  // ---- HEADER ROW: corner + class columns ----
+  // ---- HEADER: 2 rows -> year groups (colspan) + class columns ----
   const thead=tbl.createTHead();
-  const hrow=thead.insertRow();
-  hrow.className='class-header-row';
 
-  // Corner
+  // ROW 1: corner (rowspan 2) + year group headers
+  const yrow=thead.insertRow();
+  yrow.className='year-header-row';
+
   const corner=document.createElement('th');
   corner.className='corner-cell';
+  corner.rowSpan=2;
   corner.innerHTML=`<div style="text-align:center;padding:8px 4px">
     <div style="font-size:9px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase">ວັນ / ຄາບ</div>
     <div style="font-size:9px;color:var(--text-muted);margin-top:2px">ຫ້ອງ →</div>
   </div>`;
-  hrow.appendChild(corner);
+  yrow.appendChild(corner);
 
-  // Year group headers (colspan)
-  const yearGroups={};
-  CLASSES.forEach(c=>{ yearGroups[c.year]=(yearGroups[c.year]||0)+1; });
+  // Count classes per year in display order (CLASSES already sorted by year)
+  const yearOrder=[]; const yearCounts={};
+  CLASSES.forEach(c=>{
+    if(!(c.year in yearCounts)){ yearOrder.push(c.year); yearCounts[c.year]=0; }
+    yearCounts[c.year]++;
+  });
+  yearOrder.forEach(yr=>{
+    const yth=document.createElement('th');
+    yth.className='year-group-th';
+    yth.colSpan=yearCounts[yr];
+    yth.style.color=YEAR_COLORS[yr]||'var(--text)';
+    yth.innerHTML=`<span>ປີ ${yr}</span> <span style="font-size:9px;opacity:.6;font-weight:600">(${yearCounts[yr]} ສາຂາ)</span>`;
+    yrow.appendChild(yth);
+  });
 
-  // Class headers
-  CLASSES.forEach(cls=>{
+  // ROW 2: class headers
+  const hrow=thead.insertRow();
+  hrow.className='class-header-row';
+  CLASSES.forEach((cls, ci)=>{
     const th=document.createElement('th');
     th.className='class-th';
+    // mark the last column of each year group for a thicker separator
+    const isYearEnd = ci===CLASSES.length-1 || CLASSES[ci+1].year!==cls.year;
+    if(isYearEnd) th.classList.add('year-end');
     th.innerHTML=`<div class="class-th-inner" style="background:${cls.color}">
-      <div class="class-year" style="color:${YEAR_COLORS[cls.year]}">ປີ ${cls.year}</div>
       <div class="class-name">${cls.id}</div>
       <div class="class-badge" style="background:${cls.color};color:${cls.tc};border:1px solid ${cls.tc}44">${cls.name}</div>
     </div>`;
@@ -829,7 +861,8 @@ function rebuildTable(){
       // Slot cells for each class
       CLASSES.forEach((cls, ci)=>{
         const cell=row.insertCell();
-        cell.className='slot'+(currentRole!=='admin'?' ro':'');
+        const isYearEnd = ci===CLASSES.length-1 || CLASSES[ci+1].year!==cls.year;
+        cell.className='slot'+(currentRole!=='admin'?' ro':'')+(isYearEnd?' year-end':'');
         const key=`${day.key}-${cls.id}-${pi}`;
         cell.dataset.key=key;
         cell.dataset.day=day.label;
