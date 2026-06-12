@@ -398,10 +398,14 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
         <div>
           <div class="section-lbl">📅 ສົກຮຽນ / ພາກຮຽນ</div>
           <div class="field-row">
-            <label>ຂໍ້ຄວາມສະແດງ (ເຊັ່ນ ພາກຮຽນທີ II · 2025-2026)</label>
+            <label>ຊື່ພາກຮຽນປັດຈຸບັນ (ສະແດງເທິງຕາຕະລາງ)</label>
             <input type="text" id="semInput" placeholder="ພາກຮຽນທີ II · 2025-2026">
           </div>
-          <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveSemester()">💾 ບັນທຶກສົກຮຽນ</button>
+          <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveSemester()">💾 ບັນທຶກຊື່ພາກຮຽນ</button>
+          <button class="btn btn-ghost" style="width:100%;margin-top:6px" onclick="createTerm()">➕ ສ້າງພາກຮຽນໃໝ່</button>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6">
+            ແຕ່ລະພາກຮຽນເກັບຕາຕະລາງແຍກກັນ. ໃຊ້ dropdown "ເບິ່ງພາກຮຽນ" ເທິງຕາຕະລາງ ເພື່ອເບິ່ງ/ແກ້ ພາກຮຽນທີ່ຜ່ານມາ.
+          </div>
         </div>
         <hr>
         <div>
@@ -484,6 +488,10 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">ຕາຕະລາງການຮຽນ-ການສອນ ປີ 1, 2, 3 ແລະ 4</div>
         </div>
         <div class="semester-badge" id="semesterBadge">ພາກຮຽນທີ II · 2025-2026</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--text-muted)">📂 ເບິ່ງພາກຮຽນ:</span>
+          <select id="termSelect" onchange="onTermChange()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:260px"></select>
+        </div>
         <div style="flex:1"></div>
         <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 ພິມ</button>
         <button class="btn btn-primary btn-sm" onclick="saveAsPDF()">📄 PDF</button>
@@ -642,42 +650,114 @@ function setSyncStatus(text, color){
   el.style.color=color||'var(--text-muted)';
 }
 
-// ໂຫລດຕາຕະລາງລວມຈາກ server (ທຸກຄົນເຫັນຂໍ້ມູນດຽວກັນ) — public read
-async function syncFromServer(){
+// ---- ພາກຮຽນ (terms) ----
+let terms = [];            // [{id,label,is_current,sort_order}]
+let currentTermId = null;  // ພາກຮຽນທີ່ກຳລັງເບິ່ງ/ແກ້
+
+// ໂຫລດລາຍຊື່ພາກຮຽນ + ໂຫລດພາກຮຽນທີ່ເລືອກ
+async function loadTerms(){
   try{
     setSyncStatus('☁️ ກຳລັງໂຫລດ…','var(--text-muted)');
-    const { data:row, error } = await sb.from('timetable').select('data,version').eq('id',1).single();
+    const { data:rows, error } = await sb.from('terms')
+      .select('id,label,is_current,sort_order')
+      .order('sort_order',{ascending:false});
     if(error) throw error;
-    if(row&&row.data){
-      const d=row.data;
-      if(Array.isArray(d.subjects)) subjects=d.subjects.map(s=>({...s}));
-      if(d.schedule&&typeof d.schedule==='object') schedule={...d.schedule};
-      if(Array.isArray(d.classes))  CLASSES=d.classes.map(c=>({...c}));
-      if(d.meta&&typeof d.meta==='object') schoolMeta={...d.meta};
-      localStorage.setItem('snu_dataVersion', String(row.version||0));
-      saveLocal();
-      buildColorGrid(); rebuildTable(); renderSubjectList(); renderClassList(); renderMeta();
+    terms = rows||[];
+    const sel=document.getElementById('termSelect');
+    if(sel){
+      sel.innerHTML='';
+      terms.forEach(t=>{
+        const o=document.createElement('option');
+        o.value=t.id;
+        o.textContent=t.label+(t.is_current?'  ·  ປັດຈຸບັນ':'');
+        sel.appendChild(o);
+      });
     }
-    setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
+    // ເລືອກ: ຄົງພາກຮຽນເກົ່າຖ້າຍັງມີ, ບໍ່ດັ່ງນັ້ນເອົາພາກຮຽນປັດຈຸບັນ
+    let pick = (currentTermId && terms.some(t=>t.id===currentTermId))
+      ? currentTermId
+      : ((terms.find(t=>t.is_current)||terms[0]||{}).id);
+    if(sel && pick) sel.value=pick;
+    if(pick) await loadTerm(pick);
+    else setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
     setSyncStatus('⚠️ ອອບລາຍ (ໃຊ້ຂໍ້ມູນເຄື່ອງ)','var(--accent2)');
   }
 }
 
-// ບັນທຶກຕາຕະລາງຂຶ້ນ server — ໃຊ້ session ຂອງ admin (RLS ກວດ allowlist)
+// ໂຫລດຂໍ້ມູນຂອງພາກຮຽນໃດໜຶ່ງ
+async function loadTerm(id){
+  try{
+    setSyncStatus('☁️ ກຳລັງໂຫລດ…','var(--text-muted)');
+    const { data:row, error } = await sb.from('terms').select('data,version,label').eq('id',id).single();
+    if(error) throw error;
+    currentTermId=id;
+    const d=row.data||{};
+    subjects = Array.isArray(d.subjects) ? d.subjects.map(s=>({...s})) : [];
+    schedule = (d.schedule&&typeof d.schedule==='object') ? {...d.schedule} : {};
+    if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
+    schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester: row.label||'' };
+    if(!schoolMeta.semester) schoolMeta.semester = row.label||'';
+    saveLocal();
+    buildColorGrid(); buildClassColorGrid(); rebuildTable();
+    renderSubjectList(); renderClassList(); renderMeta();
+    setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
+  }catch(e){
+    setSyncStatus('⚠️ ໂຫລດພາກຮຽນບໍ່ສຳເລັດ','var(--accent2)');
+  }
+}
+
+// ປ່ຽນພາກຮຽນຈາກ dropdown
+async function onTermChange(){
+  const sel=document.getElementById('termSelect');
+  if(sel && sel.value) await loadTerm(sel.value);
+}
+
+// admin ສ້າງພາກຮຽນໃໝ່
+async function createTerm(){
+  if(currentRole!=='admin'){ alert('ຕ້ອງ login admin ກ່ອນ'); return; }
+  const label=prompt('ຊື່ພາກຮຽນໃໝ່ (ເຊັ່ນ: ພາກຮຽນທີ I · 2026-2027):','');
+  if(!label || !label.trim()) return;
+  const copy=confirm('ສຳເນົາ "ສາຂາ + ວິຊາ" ຈາກພາກຮຽນປັດຈຸບັນບໍ?\n(ຕາຕະລາງຈະວ່າງ ໃຫ້ຈັດໃໝ່)\n\nOK = ສຳເນົາ · Cancel = ເລີ່ມວ່າງລ້າ');
+  const newData = copy
+    ? { subjects:subjects.map(s=>({...s})), schedule:{}, classes:CLASSES.map(c=>({...c})), meta:{semester:label.trim()} }
+    : { subjects:[], schedule:{}, classes:null, meta:{semester:label.trim()} };
+  const id='t-'+Date.now();
+  try{
+    setSyncStatus('☁️ ກຳລັງສ້າງ…','var(--text-muted)');
+    await sb.from('terms').update({is_current:false}).eq('is_current',true);
+    const { error } = await sb.from('terms').insert({
+      id, label:label.trim(), data:newData, version:1, is_current:true,
+      sort_order: Math.floor(Date.now()/1000)
+    });
+    if(error) throw error;
+    currentTermId=id;
+    await loadTerms();
+    alert('ສ້າງພາກຮຽນໃໝ່ສຳເລັດ! ດຽວນີ້ກຳລັງເບິ່ງພາກຮຽນໃໝ່.');
+  }catch(e){
+    setSyncStatus('⚠️ ສ້າງບໍ່ສຳເລັດ','var(--accent2)');
+    alert('ສ້າງພາກຮຽນບໍ່ສຳເລັດ: '+(e.message||e)+'\n(ກວດວ່າ login admin ແລ້ວບໍ)');
+  }
+}
+
+// ບັນທຶກຕາຕະລາງຂອງພາກຮຽນປັດຈຸບັນ — ໃຊ້ session admin (RLS ກວດ allowlist)
 async function pushToServer(){
-  if(currentRole!=='admin') return;
+  if(currentRole!=='admin' || !currentTermId) return;
   try{
     setSyncStatus('☁️ ກຳລັງບັນທຶກ…','var(--text-muted)');
-    const { data:cur } = await sb.from('timetable').select('version').eq('id',1).single();
+    const { data:cur } = await sb.from('terms').select('version').eq('id',currentTermId).single();
     const newVersion = ((cur&&cur.version)||0)+1;
-    const { error } = await sb.from('timetable').update({
+    const label = (schoolMeta&&schoolMeta.semester)||'';
+    const { error } = await sb.from('terms').update({
+      label,
       data:{ subjects, schedule, classes:CLASSES, meta:schoolMeta },
       version:newVersion,
       updated_at:new Date().toISOString()
-    }).eq('id',1);
+    }).eq('id',currentTermId);
     if(error) throw error;
-    localStorage.setItem('snu_dataVersion', String(newVersion));
+    // ອັບເດດ label ໃນ dropdown ໃຫ້ກົງ
+    const sel=document.getElementById('termSelect');
+    if(sel){ const opt=[...sel.options].find(o=>o.value===currentTermId); if(opt){ const t=terms.find(x=>x.id===currentTermId); opt.textContent=label+((t&&t.is_current)?'  ·  ປັດຈຸບັນ':''); } }
     setSyncStatus('☁️ ບັນທຶກແລ້ວ · ທຸກຄົນເຫັນ','var(--accent3)');
   }catch(e){
     setSyncStatus('⚠️ ບັນທຶກບໍ່ສຳເລັດ: '+(e.message||e),'var(--accent2)');
@@ -748,11 +828,11 @@ function startApp(role, chipLabel){
   renderSubjectList();
   renderClassList();
   renderMeta();
-  // ໂຫລດຂໍ້ມູນລວມຈາກ server
-  syncFromServer();
+  // ໂຫລດລາຍຊື່ພາກຮຽນ + ພາກຮຽນທີ່ເລືອກ ຈາກ server
+  loadTerms();
   // ຜູ້ເບິ່ງ (ບໍ່ແມ່ນ admin) ດຶງຂໍ້ມູນໃໝ່ທຸກ 45 ວິນາທີ ໂດຍບໍ່ຕ້ອງ refresh
   clearInterval(_pollTimer);
-  if(role!=='admin') _pollTimer=setInterval(syncFromServer, 45000);
+  if(role!=='admin') _pollTimer=setInterval(loadTerms, 45000);
 }
 
 // ຜູ້ເບິ່ງ (teacher/student) — username/password ທ້ອງຖິ່ນ, read-only
