@@ -336,6 +336,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="data.js"></script>
 </head>
 <body>
 
@@ -1092,6 +1093,21 @@ function saveData(){
 }
 function loadData(){
   try{
+    // Seed data from data.js is the canonical source of truth.
+    // When its version is newer than what the browser last stored,
+    // (re)load it — overwriting stale local copies so every visitor
+    // sees the same up-to-date timetable.
+    const seed = window.SNU_DATA || {};
+    const seedVer   = parseInt(seed.version || 0, 10);
+    const storedVer = parseInt(localStorage.getItem('snu_dataVersion') || '0', 10);
+    if(seedVer > storedVer){
+      if(seed.subjects) subjects = seed.subjects.map(s=>({...s}));
+      if(seed.schedule) schedule = {...seed.schedule};
+      if(seed.classes)  CLASSES  = seed.classes.map(c=>({...c}));
+      localStorage.setItem('snu_dataVersion', String(seedVer));
+      saveData();
+      return;
+    }
     const subs=localStorage.getItem('snu_subjects'); if(subs) subjects=JSON.parse(subs);
     const sch=localStorage.getItem('snu_schedule');  if(sch)  schedule=JSON.parse(sch);
     const cls=localStorage.getItem('snu_classes');   if(cls)  CLASSES=JSON.parse(cls);
