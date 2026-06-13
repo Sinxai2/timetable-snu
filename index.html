@@ -480,8 +480,8 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
         <p style="font-size:12px;color:var(--text-muted);line-height:1.9;margin-top:8px">
           ທ່ານສາມາດກວດເບິ່ງ<br>ຕາຕະລາງການຮຽນ-ການສອນ<br>ແຕ່ບໍ່ສາມາດແກ້ໄຂໄດ້
         </p>
-        <hr>
-        <div>
+        <div id="teacherPanel">
+          <hr>
           <div class="section-lbl">👨‍🏫 ລາຍຊື່ອາຈານ</div>
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">ກົດຊື່ອາຈານ ເພື່ອເບິ່ງສະເພາະວິຊາທີ່ອາຈານນັ້ນສອນ (ກົດຊ້ຳເພື່ອຍົກເລີກ)</div>
           <div class="subject-list" id="teacherList"></div>
@@ -504,7 +504,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
           <span style="font-size:11px;color:var(--text-muted)">📂 ເບິ່ງພາກຮຽນ:</span>
           <select id="termSelect" onchange="onTermChange()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:260px"></select>
         </div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div id="teacherFilterWrap" style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:var(--text-muted)">👨‍🏫 ອາຈານ:</span>
           <select id="teacherFilter" onchange="onTeacherFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:200px"></select>
         </div>
@@ -892,6 +892,11 @@ function startApp(role, chipLabel){
     document.getElementById('viewSide').style.display='';
     document.getElementById('roleLabel').textContent=chipLabel;
   }
+  // ນັກຮຽນ (student) ບໍ່ເຫັນ filter/ລາຍຊື່ອາຈານ — ສະເພາະ admin & ອາຈານ
+  const showTeacherUI = (role==='admin' || role==='teacher');
+  if(!showTeacherUI) teacherFilter='';
+  const tfw=document.getElementById('teacherFilterWrap'); if(tfw) tfw.style.display=showTeacherUI?'':'none';
+  const tp=document.getElementById('teacherPanel');       if(tp)  tp.style.display=showTeacherUI?'':'none';
   loadData();
   buildColorGrid();
   buildClassColorGrid();
