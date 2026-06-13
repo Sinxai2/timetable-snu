@@ -369,11 +369,15 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
       <input type="password" id="upass" placeholder="ປ້ອນລະຫັດຜ່ານ">
     </div>
     <button class="login-btn" style="background:var(--panel);color:var(--text);box-shadow:none;border:1px solid var(--border)" onclick="doLogin()">ເຂົ້າເບິ່ງ</button>
+    <a href="register.html" class="login-btn" style="display:block;text-align:center;text-decoration:none;background:rgba(67,233,123,.12);color:var(--accent3);border:1px solid rgba(67,233,123,.3);box-shadow:none;margin-top:14px">
+      🎓👨‍🏫 ສະໝັກ / ເຂົ້າສູ່ລະບົບ ນັກຮຽນ-ອາຈານ
+    </a>
     <div class="hint-block">
       <strong>👁 ບັນຊີຜູ້ເບິ່ງ (ເບິ່ງຢ່າງດຽວ):</strong><br>
       teacher / teacher123 → ຄູສອນ<br>
       student / student123 → ນັກສຶກສາ<br>
-      <span style="color:var(--accent)">ການແກ້ໄຂ → ໃຊ້ "ເຂົ້າສູ່ລະບົບ admin ດ້ວຍ Google"</span>
+      <span style="color:var(--accent3)">ສະມາຊິກຈິງ (ມີບັນຊີ) → ໃຊ້ປຸ່ມສີຂຽວ "ສະໝັກ / ເຂົ້າສູ່ລະບົບ"</span><br>
+      <span style="color:var(--accent)">ການແກ້ໄຂ (admin) → ໃຊ້ "ເຂົ້າສູ່ລະບົບ admin ດ້ວຍ Google"</span>
     </div>
   </div>
 </div>
@@ -849,16 +853,24 @@ async function loginWithGoogle(){
   if(error){ document.getElementById('loginErr').textContent='❌ Google login error: '+error.message; }
 }
 
-// ຫຼັງ login ດ້ວຍ Google — ກວດ allowlist ຜ່ານ RPC is_admin()
+// ຫຼັງ login (Google admin ຫຼື ສະມາຊິກ email/password) — ກຳນົດບົດບາດ
 async function enterWithSession(session){
   try{
+    const user = session && session.user;
+    const email = (user && user.email) || '';
     const { data:isAdmin } = await sb.rpc('is_admin');
-    const email = (session && session.user && session.user.email) || '';
-    if(isAdmin===true){
-      startApp('admin', '👑 '+email);
-    } else {
-      startApp('student', '🎓 ຜູ້ເບິ່ງ');
-      setTimeout(()=>alert('ບັນຊີ Google ນີ້ ('+email+') ບໍ່ມີສິດ admin.\nເຂົ້າເບິ່ງແບບຜູ້ເບິ່ງ. ຖ້າຕ້ອງການສິດ admin ໃຫ້ເພີ່ມ email ນີ້ໃນ allowlist.'),300);
+    if(isAdmin===true){ startApp('admin', '👑 '+email); return; }
+    // ສະມາຊິກທີ່ສະໝັກເອງ → ດຶງ profile (ນັກຮຽນ/ອາຈານ + ຊື່)
+    let role='student', name='', prof=null;
+    try{
+      const r = await sb.from('profiles').select('full_name,role').eq('id', user.id).maybeSingle();
+      prof = r.data;
+      if(prof){ role = prof.role==='teacher'?'teacher':'student'; name = prof.full_name||''; }
+    }catch(e){}
+    const icon = role==='teacher' ? '👨‍🏫' : '🎓';
+    startApp(role, icon+' '+(name||email||'ຜູ້ໃຊ້'));
+    if(!prof && email){
+      setTimeout(()=>alert('ບັນຊີນີ້ ('+email+') ບໍ່ມີສິດ admin ແລະ ບໍ່ມີ profile.\nເຂົ້າເບິ່ງແບບຜູ້ເບິ່ງ.'),300);
     }
   }catch(e){
     startApp('student', '🎓 ຜູ້ເບິ່ງ');
@@ -925,7 +937,7 @@ function doLogin(){
   startApp(user.role, (icons[user.role]||'🎓')+' '+user.label);
 }
 async function doLogout(){
-  if(currentRole==='admin'){ try{ await sb.auth.signOut(); }catch(e){} }
+  try{ await sb.auth.signOut(); }catch(e){}
   currentRole='';
   clearInterval(_pollTimer);
   document.getElementById('loginScreen').style.display='flex';
