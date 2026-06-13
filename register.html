@@ -240,6 +240,9 @@ function laoErr(m){
 // ສະໝັກ Enter key
 document.getElementById('password').addEventListener('keydown', e=>{ if(e.key==='Enter') submitForm(); });
 
+// ເປີດແທັບ login ໂດຍກົງ ຖ້າມາຈາກລິ້ງ #login (ເຊັ່ນ "ລືມລະຫັດຜ່ານ?")
+if(location.hash === '#login') setMode('login');
+
 // ຖ້າ login ຢູ່ແລ້ວ → ກັບໄປໜ້າຕາຕະລາງ
 (async()=>{
   const { data:{ session } } = await sb.auth.getSession();

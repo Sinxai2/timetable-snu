@@ -356,28 +356,27 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
 
     <div style="display:flex;align-items:center;gap:10px;margin:18px 0 14px">
       <div style="flex:1;height:1px;background:var(--border)"></div>
-      <span style="font-size:11px;color:var(--text-muted)">ຫຼື ເຂົ້າເບິ່ງ (ຜູ້ເບິ່ງ)</span>
+      <span style="font-size:11px;color:var(--text-muted)">ຫຼື ເຂົ້າສູ່ລະບົບ ນັກຮຽນ / ອາຈານ</span>
       <div style="flex:1;height:1px;background:var(--border)"></div>
     </div>
 
     <div class="form-field">
-      <label>ຊື່ຜູ້ໃຊ້</label>
-      <input type="text" id="uname" placeholder="ປ້ອນຊື່ຜູ້ໃຊ້" autocomplete="off">
+      <label>ຊື່ຜູ້ໃຊ້ ຫຼື ອີເມວ</label>
+      <input type="text" id="uname" placeholder="ຊື່ຜູ້ໃຊ້ ຫຼື ອີເມວ" autocomplete="username">
     </div>
     <div class="form-field">
       <label>ລະຫັດຜ່ານ</label>
-      <input type="password" id="upass" placeholder="ປ້ອນລະຫັດຜ່ານ">
+      <input type="password" id="upass" placeholder="ປ້ອນລະຫັດຜ່ານ" autocomplete="current-password">
     </div>
-    <button class="login-btn" style="background:var(--panel);color:var(--text);box-shadow:none;border:1px solid var(--border)" onclick="doLogin()">ເຂົ້າເບິ່ງ</button>
+    <button class="login-btn" onclick="doLogin()">ເຂົ້າສູ່ລະບົບ</button>
+    <div style="text-align:center;margin-top:10px;font-size:12px">
+      <a href="register.html#login" style="color:var(--text-muted);text-decoration:none">ລືມລະຫັດຜ່ານ?</a>
+    </div>
     <a href="register.html" class="login-btn" style="display:block;text-align:center;text-decoration:none;background:rgba(67,233,123,.12);color:var(--accent3);border:1px solid rgba(67,233,123,.3);box-shadow:none;margin-top:14px">
-      🎓👨‍🏫 ສະໝັກ / ເຂົ້າສູ່ລະບົບ ນັກຮຽນ-ອາຈານ
+      🎓👨‍🏫 ສະໝັກສະມາຊິກໃໝ່
     </a>
-    <div class="hint-block">
-      <strong>👁 ບັນຊີຜູ້ເບິ່ງ (ເບິ່ງຢ່າງດຽວ):</strong><br>
-      teacher / teacher123 → ຄູສອນ<br>
-      student / student123 → ນັກສຶກສາ<br>
-      <span style="color:var(--accent3)">ສະມາຊິກຈິງ (ມີບັນຊີ) → ໃຊ້ປຸ່ມສີຂຽວ "ສະໝັກ / ເຂົ້າສູ່ລະບົບ"</span><br>
-      <span style="color:var(--accent)">ການແກ້ໄຂ (admin) → ໃຊ້ "ເຂົ້າສູ່ລະບົບ admin ດ້ວຍ Google"</span>
+    <div class="hint-block" style="text-align:center">
+      <span style="color:var(--accent)">ການແກ້ໄຂຕາຕະລາງ (admin) → ໃຊ້ "ເຂົ້າສູ່ລະບົບ admin ດ້ວຍ Google" ດ້ານເທິງ</span>
     </div>
   </div>
 </div>
@@ -625,11 +624,6 @@ const COLORS = [
 ];
 
 // ບັນຊີຜູ້ເບິ່ງ (read-only). admin ໃຊ້ Google login ແທນ.
-const USERS = {
-  teacher: {pass:'teacher123', role:'teacher', label:'ຄູສອນ'},
-  student: {pass:'student123', role:'student', label:'ນັກສຶກສາ'},
-};
-
 // PERIOD TIME DEFINITIONS (from PDF)
 // Mon/Tue/Thu/Fri: 5 periods | Wed: 3 blocks (different times)
 const PERIOD_TIMES_STD = [
@@ -942,17 +936,30 @@ function startApp(role, chipLabel){
   if(role!=='admin') _pollTimer=setInterval(loadTerms, 45000);
 }
 
-// ຜູ້ເບິ່ງ (teacher/student) — username/password ທ້ອງຖິ່ນ, read-only
-function doLogin(){
-  const u = document.getElementById('uname').value.trim();
-  const p = document.getElementById('upass').value;
-  const user = USERS[u];
-  if(!user || user.pass !== p){
-    document.getElementById('loginErr').textContent='❌ ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ';
+// ນັກຮຽນ/ອາຈານ — ເຂົ້າສູ່ລະບົບດ້ວຍ ຊື່ຜູ້ໃຊ້ ຫຼື ອີເມວ + ລະຫັດຜ່ານ (Supabase Auth)
+async function doLogin(){
+  const id = document.getElementById('uname').value.trim();
+  const pass = document.getElementById('upass').value;
+  const errEl = document.getElementById('loginErr');
+  errEl.textContent='';
+  if(!id || !pass){ errEl.textContent='❌ ກະລຸນາໃສ່ຊື່ຜູ້ໃຊ້/ອີເມວ ແລະ ລະຫັດຜ່ານ'; return; }
+  // ບໍ່ມີ @ → ແປງຊື່ຜູ້ໃຊ້ເປັນ email ກ່ອນ
+  let email = id;
+  if(!id.includes('@')){
+    try{ const { data:found } = await sb.rpc('email_for_username',{p_username:id}); if(found) email=found; }catch(e){}
+    if(email===id){ errEl.textContent='❌ ບໍ່ພົບຊື່ຜູ້ໃຊ້ນີ້'; return; }
+  }
+  errEl.textContent='⏳ ກຳລັງເຂົ້າສູ່ລະບົບ...';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
+  if(error){
+    errEl.textContent = '❌ ' + (
+      /Invalid login credentials/i.test(error.message) ? 'ຊື່ຜູ້ໃຊ້/ອີເມວ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ'
+      : /Email not confirmed/i.test(error.message) ? 'ຍັງບໍ່ໄດ້ຢືນຢັນອີເມວ — ກະລຸນາກວດກ່ອງອີເມວ'
+      : error.message );
     return;
   }
-  const icons={teacher:'👨‍🏫',student:'🎓'};
-  startApp(user.role, (icons[user.role]||'🎓')+' '+user.label);
+  errEl.textContent='';
+  if(data.session) await enterWithSession(data.session); // ກວດ role + ການອະນຸມັດ
 }
 async function doLogout(){
   try{ await sb.auth.signOut(); }catch(e){}
