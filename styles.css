@@ -1,0 +1,330 @@
+/* ============================================================
+   SNU TIMETABLE — ໄຟລ໌ CSS ຫຼັກ (ໃຊ້ໂດຍ index.html)
+   ============================================================ */
+:root {
+  --bg:#0a0a12; --surface:#12121e; --panel:#1a1a2e; --border:#252540;
+  --accent:#6c63ff; --accent2:#ff6584; --accent3:#43e97b;
+  --text:#e8e8f5; --text-muted:#6868a0;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans Lao',sans-serif;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse 70% 50% at 15% 10%,rgba(108,99,255,.1) 0%,transparent 60%),
+  radial-gradient(ellipse 50% 40% at 85% 85%,rgba(255,101,132,.07) 0%,transparent 60%);
+  pointer-events:none;z-index:0;}
+
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+.login-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:44px 40px;width:420px;max-width:96vw;box-shadow:0 40px 100px rgba(0,0,0,.7);animation:slideUp .35s cubic-bezier(.16,1,.3,1);}
+@keyframes slideUp{from{transform:translateY(24px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.login-brand{text-align:center;margin-bottom:28px;}
+.login-brand .logo-text{font-family:'Bebas Neue',cursive;font-size:30px;letter-spacing:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.login-brand .logo-sub{font-size:12px;color:var(--text-muted);margin-top:4px;line-height:1.6;}
+.form-field{margin-bottom:14px;}
+.form-field label{display:block;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;}
+.form-field input{width:100%;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:10px;padding:12px 14px;font-family:'Noto Sans Lao',sans-serif;font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s;}
+.form-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(108,99,255,.18);}
+.login-btn{width:100%;padding:13px;margin-top:6px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),#9c8eff);color:#fff;font-family:'Noto Sans Lao',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 6px 24px rgba(108,99,255,.4);transition:all .2s;}
+.login-btn:hover{transform:translateY(-2px);box-shadow:0 10px 32px rgba(108,99,255,.55);}
+.login-err{color:var(--accent2);font-size:12px;text-align:center;min-height:16px;margin-top:8px;}
+.hint-block{margin-top:16px;padding:12px 14px;background:var(--panel);border-radius:10px;border:1px solid var(--border);font-size:12px;color:var(--text-muted);line-height:2;}
+.hint-block strong{color:var(--text);}
+
+/* APP */
+.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh;}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:rgba(10,10,18,.93);backdrop-filter:blur(16px);position:sticky;top:0;z-index:100;}
+.hd-logo{font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:3px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hd-center{font-size:13px;color:var(--text-muted);}
+.hd-right{display:flex;gap:8px;align-items:center;}
+.user-chip{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;}
+.user-chip.admin{background:rgba(247,196,106,.12);color:#f7c46a;border:1px solid rgba(247,196,106,.25);}
+.user-chip.teacher{background:rgba(67,233,123,.12);color:#43e97b;border:1px solid rgba(67,233,123,.25);}
+.user-chip.student{background:rgba(108,99,255,.12);color:#a89cff;border:1px solid rgba(108,99,255,.25);}
+.btn{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:700;transition:all .18s;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#9c8eff);color:#fff;box-shadow:0 3px 12px rgba(108,99,255,.35);}
+.btn-primary:hover{transform:translateY(-1px);}
+.btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:rgba(255,101,132,.12);color:var(--accent2);border:1px solid rgba(255,101,132,.25);}
+.btn-danger:hover{background:rgba(255,101,132,.22);}
+.btn-logout{background:rgba(255,101,132,.08);color:var(--accent2);border:1px solid rgba(255,101,132,.2);font-size:11px;padding:5px 11px;}
+.btn-logout:hover{background:rgba(255,101,132,.2);}
+
+/* MAIN LAYOUT */
+main{display:grid;grid-template-columns:260px 1fr;flex:1;height:calc(100vh - 50px);}
+
+/* SIDEBAR */
+aside{background:var(--surface);border-right:1px solid var(--border);padding:18px 14px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;}
+.section-lbl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
+.field-row{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
+.field-row label{font-size:11px;color:var(--text-muted);font-weight:600;}
+.field-row input,.field-row select{background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:8px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;outline:none;transition:border-color .15s;}
+.field-row input:focus,.field-row select:focus{border-color:var(--accent);}
+.field-row select option{background:var(--panel);}
+.color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
+.cswatch{width:100%;aspect-ratio:1;border-radius:5px;border:2px solid transparent;cursor:pointer;transition:transform .15s,border-color .15s;}
+.cswatch:hover{transform:scale(1.2);}
+.cswatch.active{border-color:#fff;box-shadow:0 0 6px rgba(255,255,255,.3);}
+.subject-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;}
+.subject-chip{display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--panel);border-radius:7px;border:1px solid var(--border);font-size:11px;transition:border-color .15s;}
+.subject-chip:hover{border-color:var(--accent);}
+.chip-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.chip-name{flex:1;font-weight:600;}
+.chip-room{font-size:9px;color:var(--text-muted);}
+.chip-del{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:0 2px;transition:color .15s;}
+.chip-del:hover{color:var(--accent2);}
+.notice-box{display:flex;align-items:center;gap:7px;padding:10px 12px;background:rgba(67,233,123,.07);border:1px solid rgba(67,233,123,.2);border-radius:8px;font-size:12px;color:#43e97b;}
+.btn-row{display:flex;gap:5px;flex-wrap:wrap;}
+.btn-sm{padding:5px 10px;font-size:11px;}
+hr{border-color:var(--border);margin:2px 0;}
+
+/* ===================== TIMETABLE AREA ===================== */
+.tt-area{padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:14px;background:var(--bg);}
+.tt-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.school-title{font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:2px;color:var(--text);}
+.semester-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(108,99,255,.15);color:var(--accent);border:1px solid rgba(108,99,255,.3);}
+.tt-scroll{overflow:auto;border-radius:12px;border:1px solid var(--border);}
+
+/* Mobile picker + card view (hidden on desktop) */
+.mobile-picker{display:none;}
+.mobile-cards{display:none;}
+.mobile-picker label{font-size:12px;color:var(--text-muted);font-weight:600;display:block;margin-bottom:6px;}
+.mobile-picker select{
+  width:100%;background:var(--surface);border:1.5px solid var(--border);
+  color:var(--text);border-radius:10px;padding:12px 14px;
+  font-family:'Noto Sans Lao',sans-serif;font-size:15px;font-weight:700;
+  outline:none;
+}
+.mobile-picker select:focus{border-color:var(--accent);}
+
+.day-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;overflow:hidden;
+}
+.day-card-head{
+  padding:10px 14px;font-size:14px;font-weight:700;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  letter-spacing:.5px;
+}
+.day-card-rows{display:flex;flex-direction:column;}
+.day-card-row{
+  display:flex;align-items:stretch;gap:0;
+  border-bottom:1px solid var(--border);
+  min-height:64px;
+}
+.day-card-row:last-child{border-bottom:none;}
+.dc-time{
+  width:84px;flex-shrink:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 4px;background:rgba(108,99,255,.05);
+  border-right:1px solid var(--border);
+}
+.dc-time .pnum{font-size:12px;font-weight:700;color:var(--accent);}
+.dc-time .ptime{font-size:10px;color:var(--text-muted);margin-top:2px;text-align:center;line-height:1.3;}
+.dc-content{flex:1;display:flex;align-items:center;padding:10px 14px;}
+.dc-empty{font-size:12px;color:var(--text-muted);font-style:italic;}
+.dc-sub{display:flex;flex-direction:column;gap:2px;}
+.dc-sub-name{font-size:14px;font-weight:700;}
+.dc-sub-meta{font-size:11px;opacity:.75;font-weight:400;}
+.dc-labor{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:10px 14px;color:#43e97b;font-weight:700;font-size:13px;
+}
+
+
+/* ===================== TABLE ===================== */
+table{border-collapse:collapse;background:var(--surface);}
+
+/* Top-left corner cell */
+.corner-cell{
+  background:var(--panel);
+  position:sticky;left:0;top:0;
+  z-index:30;
+  min-width:110px;width:110px;
+  border-right:2px solid var(--border);
+  border-bottom:2px solid var(--border);
+}
+
+/* Year group header row (top) */
+.year-group-th{
+  background:var(--panel);
+  position:sticky;top:0;
+  z-index:25;
+  height:30px;
+  text-align:center;
+  font-size:13px;font-weight:700;letter-spacing:1px;
+  border-bottom:1px solid var(--border);
+  border-right:2px solid var(--border);
+}
+
+/* Class header row */
+.class-header-row th{
+  background:var(--panel);
+  position:sticky;top:30px;
+  z-index:20;
+  padding:0;
+  border-bottom:2px solid var(--border);
+  border-right:1px solid var(--border);
+}
+/* Thicker separator at the end of each year group */
+.class-header-row th.year-end{border-right:2px solid var(--accent);}
+td.slot.year-end{border-right:2px solid var(--accent);}
+.class-th{
+  min-width:130px;width:130px;
+  padding:0;
+}
+.class-th-inner{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 4px;gap:2px;
+}
+.class-year{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);}
+.class-name{font-size:13px;font-weight:700;color:var(--text);}
+.class-badge{font-size:9px;padding:1px 6px;border-radius:8px;margin-top:1px;}
+
+/* Day+time column (sticky left) */
+.day-time-cell{
+  background:var(--panel);
+  position:sticky;left:0;
+  z-index:10;
+  min-width:110px;width:110px;
+  border-right:2px solid var(--border);
+  padding:6px 8px;
+  vertical-align:middle;
+}
+.day-label{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.5px;}
+.period-num{font-size:11px;font-weight:700;color:var(--text);margin-top:1px;}
+.period-time{font-size:9px;color:var(--text-muted);margin-top:1px;line-height:1.3;}
+
+/* Day group header */
+.day-group-header{
+  background:var(--panel);
+  position:sticky;left:0;
+  z-index:10;
+  border-right:2px solid var(--border);
+  border-bottom:1px solid var(--border);
+  border-top:2px solid var(--border);
+  padding:7px 10px;
+  text-align:left;
+}
+.day-group-text{font-size:12px;font-weight:700;letter-spacing:.5px;}
+
+/* Slot cells */
+td.slot{
+  min-width:130px;width:130px;
+  height:52px;
+  vertical-align:middle;text-align:center;
+  position:relative;padding:0;
+  border:1px solid var(--border);
+  cursor:pointer;
+  transition:background .15s;
+}
+td.slot:hover{background:rgba(108,99,255,.1);}
+td.slot.ro{cursor:default;}
+td.slot.ro:hover{background:transparent;}
+.slot-inner{
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:1px;padding:3px 5px;
+  font-size:10px;font-weight:700;line-height:1.3;
+  transition:filter .15s;
+}
+.slot-inner:hover{filter:brightness(1.1);}
+.slot-code{font-size:9px;opacity:.8;font-weight:400;}
+.slot-room{font-size:8px;opacity:.7;font-weight:400;}
+.plus-hint{opacity:0;color:var(--accent);font-size:18px;transition:opacity .15s;}
+td.slot:not(.ro):hover .plus-hint{opacity:.45;}
+
+/* Row borders for day separation */
+tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(5px);z-index:200;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:26px;width:380px;max-width:96vw;box-shadow:0 28px 70px rgba(0,0,0,.6);animation:slideUp .22s cubic-bezier(.16,1,.3,1);}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:4px;}
+.modal-sub{font-size:11px;color:var(--text-muted);margin-bottom:16px;}
+.sub-opts{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;}
+.sub-opt-btn{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;font-family:'Noto Sans Lao',sans-serif;font-size:12px;text-align:left;transition:all .15s;width:100%;}
+.sub-opt-btn:hover{border-color:var(--accent);}
+.sub-opt-btn.sel{border-color:var(--accent);background:rgba(108,99,255,.15);}
+.modal-actions{display:flex;gap:7px;margin-top:16px;}
+
+/* PRINT */
+@media print{
+  body{background:#fff;color:#111;}
+  body::before,#loginScreen,header,aside,.tt-top{display:none!important;}
+  main{display:block;}
+  .tt-area{padding:0;}
+  .tt-scroll{border:none;overflow:visible;}
+  table{border:1px solid #999;width:100%;}
+  .class-header-row th,.corner-cell,.day-time-cell,.day-group-header,.year-group-th{background:#f0f0f0!important;color:#111!important;-webkit-print-color-adjust:exact;}
+  td.slot{min-width:80px;width:auto;}
+  .slot-inner{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  main{grid-template-columns:1fr;}
+  aside{max-height:300px;border-right:none;border-bottom:1px solid var(--border);}
+}
+
+@media(max-width:600px){
+  .hd-center{display:none;}
+  header{padding:10px 12px;}
+  .hd-logo{font-size:18px;}
+
+  .tt-area{padding:10px 8px;gap:10px;}
+  .tt-top{gap:8px;}
+  .school-title{font-size:15px;}
+  .semester-badge{font-size:10px;padding:3px 10px;}
+
+  /* hide big table, show card view */
+  .tt-scroll{display:none;}
+  .mobile-picker{display:block;}
+  .mobile-cards{display:flex;flex-direction:column;gap:12px;}
+
+  /* Bigger sticky left column */
+  .corner-cell, .day-time-cell{
+    min-width:88px;width:88px;
+    padding:8px 6px;
+  }
+  .day-label{font-size:13px;}
+  .period-num{font-size:13px;margin-top:3px;}
+  .period-time{font-size:11px;margin-top:3px;}
+
+  /* Bigger, taller, more legible cells */
+  .class-th{min-width:160px;width:160px;}
+  .class-th-inner{padding:12px 6px;gap:4px;}
+  .class-year{font-size:11px;}
+  .class-name{font-size:16px;}
+  .class-badge{font-size:11px;padding:2px 9px;}
+
+  td.slot{
+    min-width:160px;width:160px;
+    height:76px;
+  }
+  .slot-inner{
+    font-size:13px;
+    padding:6px 8px;
+    gap:3px;
+  }
+  .slot-code{font-size:11px;}
+  .slot-room{font-size:11px;}
+  .plus-hint{font-size:24px;}
+
+  /* Sidebar full width, larger touch targets */
+  aside{padding:14px 12px;gap:14px;max-height:none;}
+  .field-row input, .field-row select{
+    padding:11px 12px; font-size:14px;
+  }
+  .field-row label{font-size:12px;}
+  .btn{padding:10px 16px;font-size:13px;}
+  .btn-sm{padding:8px 14px;font-size:12px;}
+  .color-grid{grid-template-columns:repeat(8,1fr);gap:6px;}
+  .cswatch{border-radius:7px;}
+
+  /* Modal */
+  .modal{padding:20px;border-radius:16px;}
+  .modal-title{font-size:16px;}
+  .sub-opt-btn{padding:13px 14px;font-size:14px;}
+}
