@@ -400,6 +400,14 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
       <!-- Admin -->
       <div id="adminSide">
         <div>
+          <div class="section-lbl">👥 ສະມາຊິກ</div>
+          <a href="members.html" class="btn btn-primary" style="display:block;text-align:center;text-decoration:none;width:100%">ເບິ່ງ / ອະນຸມັດ ສະມາຊິກ</a>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6">
+            ນັກຮຽນ/ອາຈານ ທີ່ສະໝັກໃໝ່ ຕ້ອງໄດ້ຮັບການອະນຸມັດກ່ອນຈຶ່ງເຂົ້າເບິ່ງໄດ້.
+          </div>
+        </div>
+        <hr>
+        <div>
           <div class="section-lbl">📅 ສົກຮຽນ / ພາກຮຽນ</div>
           <div class="field-row">
             <label>ຊື່ພາກຮຽນປັດຈຸບັນ (ສະແດງເທິງຕາຕະລາງ)</label>
@@ -860,13 +868,23 @@ async function enterWithSession(session){
     const email = (user && user.email) || '';
     const { data:isAdmin } = await sb.rpc('is_admin');
     if(isAdmin===true){ startApp('admin', '👑 '+email); return; }
-    // ສະມາຊິກທີ່ສະໝັກເອງ → ດຶງ profile (ນັກຮຽນ/ອາຈານ + ຊື່)
-    let role='student', name='', prof=null;
+    // ສະມາຊິກທີ່ສະໝັກເອງ → ດຶງ profile (ນັກຮຽນ/ອາຈານ + ຊື່ + ສະຖານະອະນຸມັດ)
+    let prof=null;
     try{
-      const r = await sb.from('profiles').select('full_name,role').eq('id', user.id).maybeSingle();
+      const r = await sb.from('profiles').select('full_name,role,approved').eq('id', user.id).maybeSingle();
       prof = r.data;
-      if(prof){ role = prof.role==='teacher'?'teacher':'student'; name = prof.full_name||''; }
     }catch(e){}
+    // admin ຍັງບໍ່ອະນຸມັດ → ບໍ່ໃຫ້ເຂົ້າ
+    if(prof && prof.approved===false){
+      try{ await sb.auth.signOut(); }catch(e){}
+      document.getElementById('loginScreen').style.display='flex';
+      document.getElementById('app').style.display='none';
+      const le=document.getElementById('loginErr'); if(le) le.textContent='⏳ ບັນຊີຂອງທ່ານກຳລັງລໍຖ້າ admin ອະນຸມັດ';
+      setTimeout(()=>alert('ບັນຊີ "'+(prof.full_name||email)+'" ກຳລັງລໍຖ້າ admin ອະນຸມັດ.\nກະລຸນາລໍຖ້າ ຫຼື ຕິດຕໍ່ admin.'),200);
+      return;
+    }
+    const role = (prof && prof.role==='teacher') ? 'teacher' : 'student';
+    const name = (prof && prof.full_name) || '';
     const icon = role==='teacher' ? '👨‍🏫' : '🎓';
     startApp(role, icon+' '+(name||email||'ຜູ້ໃຊ້'));
     if(!prof && email){

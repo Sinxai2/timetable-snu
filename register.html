@@ -108,6 +108,9 @@ body::before{content:'';position:fixed;inset:0;background:
     <div class="msg" id="msg"></div>
 
     <div class="foot">
+      <div id="forgotWrap" class="hide" style="margin-bottom:12px">
+        <a href="#" onclick="forgotPassword();return false;">ລືມລະຫັດຜ່ານ?</a>
+      </div>
       <span id="footText">ມີບັນຊີແລ້ວ?</span>
       <a href="#" id="footLink" onclick="toggleMode();return false;">ເຂົ້າສູ່ລະບົບ</a>
       <br><br>
@@ -136,6 +139,7 @@ function setMode(m){
   document.getElementById('email').placeholder = isSignup ? 'you@example.com' : 'ອີເມວ ຫຼື ຊື່ຜູ້ໃຊ້';
   document.getElementById('footText').textContent = isSignup ? 'ມີບັນຊີແລ້ວ?' : 'ຍັງບໍ່ມີບັນຊີ?';
   document.getElementById('footLink').textContent = isSignup ? 'ເຂົ້າສູ່ລະບົບ' : 'ສະໝັກສະມາຊິກ';
+  document.getElementById('forgotWrap').classList.toggle('hide', isSignup);
   setMsg('');
 }
 function toggleMode(){ setMode(mode==='signup'?'login':'signup'); }
@@ -203,6 +207,23 @@ async function submitForm(){
     setMsg('✅ ເຂົ້າສຳເລັດ! ກຳລັງໄປໜ້າຕາຕະລາງ...','ok');
     setTimeout(()=>{ location.href='index.html'; }, 700);
   }
+}
+
+// ລືມລະຫັດຜ່ານ — ສົ່ງລິ້ງຕັ້ງລະຫັດໃໝ່ໄປທາງອີເມວ
+async function forgotPassword(){
+  let id = document.getElementById('email').value.trim();
+  if(!id){ setMsg('❌ ກະລຸນາໃສ່ອີເມວ ຫຼື ຊື່ຜູ້ໃຊ້ໃນຊ່ອງເທິງກ່ອນ ແລ້ວກົດ "ລືມລະຫັດຜ່ານ?"','err'); return; }
+  let email = id;
+  if(!id.includes('@')){
+    const { data:found } = await sb.rpc('email_for_username', { p_username:id });
+    if(!found){ setMsg('❌ ບໍ່ພົບຊື່ຜູ້ໃຊ້ນີ້','err'); return; }
+    email = found;
+  }
+  setMsg('⏳ ກຳລັງສົ່ງລິ້ງ...');
+  const redirectTo = window.location.origin + window.location.pathname.replace(/register\.html$/, 'reset-password.html');
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  if(error){ setMsg('❌ '+laoErr(error.message),'err'); return; }
+  setMsg('✅ ສົ່ງລິ້ງຕັ້ງລະຫັດໃໝ່ໄປທີ່ອີເມວແລ້ວ — ກະລຸນາກວດກ່ອງອີເມວ (ລວມທັງ Spam)','ok');
 }
 
 // ແປ error ທົ່ວໄປເປັນລາວ
