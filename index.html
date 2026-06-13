@@ -419,8 +419,12 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
             <input type="text" id="subName" placeholder="ຊື່ວິຊາ">
           </div>
           <div class="field-row">
-            <label>ຫ້ອງ / ອາຈານ</label>
-            <input type="text" id="subRoom" placeholder="R101 / ຊື່ອາຈານ">
+            <label>ຫ້ອງຮຽນ</label>
+            <input type="text" id="subRoom" placeholder="R101">
+          </div>
+          <div class="field-row">
+            <label>ອາຈານຜູ້ສອນ</label>
+            <input type="text" id="subTeacher" placeholder="ຊື່ອາຈານ">
           </div>
           <div class="field-row">
             <label>ສີ</label>
@@ -475,6 +479,13 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
         <p style="font-size:12px;color:var(--text-muted);line-height:1.9;margin-top:8px">
           ທ່ານສາມາດກວດເບິ່ງ<br>ຕາຕະລາງການຮຽນ-ການສອນ<br>ແຕ່ບໍ່ສາມາດແກ້ໄຂໄດ້
         </p>
+        <hr>
+        <div>
+          <div class="section-lbl">👨‍🏫 ລາຍຊື່ອາຈານ</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">ກົດຊື່ອາຈານ ເພື່ອເບິ່ງສະເພາະວິຊາທີ່ອາຈານນັ້ນສອນ (ກົດຊ້ຳເພື່ອຍົກເລີກ)</div>
+          <div class="subject-list" id="teacherList"></div>
+        </div>
+        <hr>
         <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="window.print()">🖨 ພິມຕາຕະລາງ</button>
         <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveAsPDF()">📄 ບັນທຶກ PDF</button>
       </div>
@@ -491,6 +502,10 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:var(--text-muted)">📂 ເບິ່ງພາກຮຽນ:</span>
           <select id="termSelect" onchange="onTermChange()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:260px"></select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--text-muted)">👨‍🏫 ອາຈານ:</span>
+          <select id="teacherFilter" onchange="onTeacherFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:200px"></select>
         </div>
         <div style="flex:1"></div>
         <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 ພິມ</button>
@@ -713,7 +728,7 @@ async function loadTerm(id){
     if(!schoolMeta.semester) schoolMeta.semester = row.label||'';
     saveLocal();
     buildColorGrid(); buildClassColorGrid(); rebuildTable();
-    renderSubjectList(); renderClassList(); renderMeta();
+    renderSubjectList(); renderClassList(); renderMeta(); refreshTeacherUI();
     setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
     // ອອບລາຍ → ໃຊ້ໄຟລ໌ສຳຮອງ data.js
@@ -843,6 +858,7 @@ function startApp(role, chipLabel){
   renderSubjectList();
   renderClassList();
   renderMeta();
+  refreshTeacherUI();
   // ໂຫລດລາຍຊື່ພາກຮຽນ + ພາກຮຽນທີ່ເລືອກ ຈາກ server
   loadTerms();
   // ຜູ້ເບິ່ງ (ບໍ່ແມ່ນ admin) ດຶງຂໍ້ມູນໃໝ່ທຸກ 45 ວິນາທີ ໂດຍບໍ່ຕ້ອງ refresh
@@ -915,18 +931,20 @@ function addSubject(){
     code:document.getElementById('subCode').value.trim(),
     name,
     room:document.getElementById('subRoom').value.trim(),
+    teacher:document.getElementById('subTeacher').value.trim(),
     color:pickedColor
   });
   document.getElementById('subCode').value='';
   document.getElementById('subName').value='';
   document.getElementById('subRoom').value='';
-  renderSubjectList(); renderCells(); saveData();
+  document.getElementById('subTeacher').value='';
+  renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
 }
 function delSubject(id){
   if(!confirm('ລຶບວິຊານີ້?'))return;
   subjects=subjects.filter(s=>s.id!==id);
   Object.keys(schedule).forEach(k=>{if(schedule[k]===id)delete schedule[k];});
-  renderSubjectList(); renderCells(); saveData();
+  renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
 }
 function renderSubjectList(){
   const el=document.getElementById('subjectList');
@@ -937,11 +955,69 @@ function renderSubjectList(){
     const div=document.createElement('div');
     div.className='subject-chip';
     div.innerHTML=`<div class="chip-dot" style="background:${s.color}"></div>
-      <div style="flex:1"><div class="chip-name">${s.code?s.code+' ':''} ${s.name}</div>${s.room?`<div class="chip-room">${s.room}</div>`:''}</div>
+      <div style="flex:1"><div class="chip-name">${s.code?s.code+' ':''} ${s.name}</div>${(s.room||s.teacher)?`<div class="chip-room">${[s.room,s.teacher].filter(Boolean).join(' · ')}</div>`:''}</div>
       ${currentRole==='admin'?`<button class="chip-del" onclick="delSubject(${s.id})">✕</button>`:''}`;
     el.appendChild(div);
   });
 }
+
+// ============================================================
+// ກັ່ນຕອງ / ລາຍຊື່ອາຈານ
+// ============================================================
+let teacherFilter = ''; // ວ່າງ = ສະແດງທຸກວິຊາ
+
+function teacherList(){
+  const set=new Set();
+  subjects.forEach(s=>{ if(s.teacher && String(s.teacher).trim()) set.add(String(s.teacher).trim()); });
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+// ວິຊານີ້ຄວນສະແດງບໍ ພາຍໃຕ້ການກັ່ນຕອງປັດຈຸບັນ
+function subjectVisible(sub){
+  return !teacherFilter || (sub && sub.teacher===teacherFilter);
+}
+// ສ້າງ dropdown ກັ່ນຕອງອາຈານ
+function buildTeacherFilter(){
+  const sel=document.getElementById('teacherFilter');
+  if(!sel) return;
+  const names=teacherList();
+  sel.innerHTML='';
+  const all=document.createElement('option'); all.value=''; all.textContent='ທັງໝົດ'; sel.appendChild(all);
+  names.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
+  if(teacherFilter && names.includes(teacherFilter)) sel.value=teacherFilter;
+  else { teacherFilter=''; sel.value=''; }
+}
+function onTeacherFilter(){
+  const sel=document.getElementById('teacherFilter');
+  teacherFilter = sel ? sel.value : '';
+  renderCells();
+  renderTeacherList();
+}
+// ລາຍຊື່ອາຈານ (ກົດເພື່ອກັ່ນຕອງ)
+function renderTeacherList(){
+  const el=document.getElementById('teacherList');
+  if(!el) return;
+  const names=teacherList();
+  el.innerHTML='';
+  if(names.length===0){ el.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:6px 0">ຍັງບໍ່ມີຂໍ້ມູນອາຈານ</div>'; return; }
+  names.forEach(n=>{
+    const count=subjects.filter(s=>s.teacher===n).length;
+    const active=(n===teacherFilter);
+    const div=document.createElement('div');
+    div.className='subject-chip';
+    div.style.cursor='pointer';
+    if(active){ div.style.borderColor='var(--accent)'; div.style.background='rgba(108,99,255,.12)'; }
+    div.innerHTML=`<div class="chip-dot" style="background:var(--accent)"></div>
+      <div style="flex:1"><div class="chip-name">${n}</div><div class="chip-room">${count} ວິຊາ</div></div>
+      ${active?'<span style="color:var(--accent);font-size:11px">✓</span>':''}`;
+    div.onclick=()=>{
+      teacherFilter=(teacherFilter===n?'':n);
+      const sel=document.getElementById('teacherFilter'); if(sel) sel.value=teacherFilter;
+      renderCells(); renderTeacherList();
+    };
+    el.appendChild(div);
+  });
+}
+function refreshTeacherUI(){ buildTeacherFilter(); renderTeacherList(); }
 
 // ============================================================
 // CLASS (ຊັ້ນປີ/ສາຂາ) MANAGEMENT
@@ -1233,14 +1309,15 @@ function renderMobileCards(){
       const content=document.createElement('div');
       content.className='dc-content';
       const key=`${day.key}-${clsId}-${pi}`;
-      const sub=subjects.find(s=>s.id===schedule[key]);
+      const assigned=subjects.find(s=>s.id===schedule[key]);
+      const sub=(assigned && subjectVisible(assigned)) ? assigned : null; // ກັ່ນຕອງຕາມອາຈານ
       if(sub){
         content.style.background=sub.color;
         content.style.color=isDark(sub.color)?'#fff':'#111';
         content.innerHTML=`<div class="dc-sub">
           ${sub.code?`<span class="dc-sub-meta">${sub.code}</span>`:''}
           <span class="dc-sub-name">${sub.name}</span>
-          ${sub.room?`<span class="dc-sub-meta">${sub.room}</span>`:''}
+          ${[sub.room, sub.teacher?'👨‍🏫 '+sub.teacher:''].filter(Boolean).map(x=>`<span class="dc-sub-meta">${x}</span>`).join('')}
         </div>`;
       } else {
         content.innerHTML='<span class="dc-empty">ບໍ່ມີຮຽນ</span>';
@@ -1275,7 +1352,8 @@ function renderMobileCards(){
 }
 
 function renderCell(cell, key){
-  const sub=subjects.find(s=>s.id===schedule[key]);
+  const assigned=subjects.find(s=>s.id===schedule[key]);
+  const sub=(assigned && subjectVisible(assigned)) ? assigned : null; // ກັ່ນຕອງຕາມອາຈານ
   cell.innerHTML='';
   if(sub){
     const d=document.createElement('div');
@@ -1284,9 +1362,10 @@ function renderCell(cell, key){
     d.style.color=isDark(sub.color)?'#fff':'#111';
     d.innerHTML=`${sub.code?`<span class="slot-code">${sub.code}</span>`:''}
       <span>${sub.name}</span>
-      ${sub.room?`<span class="slot-room">${sub.room}</span>`:''}`;
+      ${sub.room?`<span class="slot-room">${sub.room}</span>`:''}
+      ${sub.teacher?`<span class="slot-room">👨‍🏫 ${sub.teacher}</span>`:''}`;
     cell.appendChild(d);
-  } else if(currentRole==='admin'){
+  } else if(currentRole==='admin' && !assigned){
     const h=document.createElement('div');h.className='plus-hint';h.textContent='+';cell.appendChild(h);
   }
 }
@@ -1321,7 +1400,7 @@ function openModal(key, dayLabel, clsId, periodNum){
       btn.className='sub-opt-btn'+(isSel?' sel':'');
       if(isSel){btn.style.background=s.color+'33';btn.style.borderColor=s.color;}
       btn.innerHTML=`<div style="width:9px;height:9px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
-        <div><div style="font-weight:700">${s.code?s.code+' ':''} ${s.name}</div>${s.room?`<div style="font-size:9px;opacity:.7">${s.room}</div>`:''}</div>`;
+        <div><div style="font-weight:700">${s.code?s.code+' ':''} ${s.name}</div>${(s.room||s.teacher)?`<div style="font-size:9px;opacity:.7">${[s.room,s.teacher].filter(Boolean).join(' · ')}</div>`:''}</div>`;
       btn.onclick=()=>selectSubject(s.id);
       body.appendChild(btn);
     });

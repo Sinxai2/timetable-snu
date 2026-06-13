@@ -25,7 +25,7 @@ window.SNU_DATA = {
       sort_order: 200,
       data: {
         subjects: [
-          { id: 1000001, code: '3321', name: 'ພາສາອັງກິດ', room: 'R203 / ສຸເທວາ', color: '#38bdf8' }
+          { id: 1000001, code: '3321', name: 'ພາສາອັງກິດ', room: 'R203', teacher: 'ສຸເທວາ', color: '#38bdf8' }
         ],
         schedule: {
           'mon-1AI-1': 1000001   // ວັນຈັນ · 1AI · ຄາບ 2 · ພາສາອັງກິດ
