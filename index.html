@@ -403,6 +403,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
           </div>
           <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="saveSemester()">💾 ບັນທຶກຊື່ພາກຮຽນ</button>
           <button class="btn btn-ghost" style="width:100%;margin-top:6px" onclick="createTerm()">➕ ສ້າງພາກຮຽນໃໝ່</button>
+          <button class="btn btn-danger" style="width:100%;margin-top:6px" onclick="deleteTerm()">🗑 ລົບພາກຮຽນທີ່ກຳລັງເບິ່ງ</button>
           <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6">
             ແຕ່ລະພາກຮຽນເກັບຕາຕະລາງແຍກກັນ. ໃຊ້ dropdown "ເບິ່ງພາກຮຽນ" ເທິງຕາຕະລາງ ເພື່ອເບິ່ງ/ແກ້ ພາກຮຽນທີ່ຜ່ານມາ.
           </div>
@@ -506,6 +507,17 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:var(--text-muted)">👨‍🏫 ອາຈານ:</span>
           <select id="teacherFilter" onchange="onTeacherFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:200px"></select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--text-muted)">📆 ວັນ:</span>
+          <select id="dayFilter" onchange="onDayFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none">
+            <option value="">ທັງໝົດ</option>
+            <option value="mon">ວັນຈັນ</option>
+            <option value="tue">ວັນອັງຄານ</option>
+            <option value="wed">ວັນພຸດ</option>
+            <option value="thu">ວັນພະຫັດ</option>
+            <option value="fri">ວັນສຸກ</option>
+          </select>
         </div>
         <div style="flex:1"></div>
         <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨 ພິມ</button>
@@ -770,6 +782,35 @@ async function createTerm(){
   }
 }
 
+// admin ລົບພາກຮຽນທີ່ກຳລັງເບິ່ງ
+async function deleteTerm(){
+  if(currentRole!=='admin'){ alert('ຕ້ອງ login admin ກ່ອນ'); return; }
+  if(!currentTermId) return;
+  if(terms.length<=1){ alert('ຕ້ອງມີຢ່າງໜ້ອຍ 1 ພາກຮຽນ — ລົບອັນສຸດທ້າຍບໍ່ໄດ້'); return; }
+  const t=terms.find(x=>x.id===currentTermId);
+  if(!confirm('ລົບພາກຮຽນ "'+(t?t.label:currentTermId)+'" ພ້ອມຕາຕະລາງທັງໝົດຂອງມັນ?\n⚠️ ການກະທຳນີ້ກູ້ຄືນບໍ່ໄດ້!')) return;
+  try{
+    setSyncStatus('☁️ ກຳລັງລົບ…','var(--text-muted)');
+    const wasCurrent = t && t.is_current;
+    const { error } = await sb.from('terms').delete().eq('id',currentTermId);
+    if(error) throw error;
+    // ຖ້າລົບພາກຮຽນປັດຈຸບັນ → ຕັ້ງພາກຮຽນລ່າສຸດທີ່ເຫຼືອເປັນປັດຈຸບັນ
+    const remaining = terms.filter(x=>x.id!==currentTermId);
+    if(wasCurrent && remaining.length){
+      const newest = remaining.slice().sort((a,b)=>(b.sort_order||0)-(a.sort_order||0))[0];
+      await sb.from('terms').update({is_current:true}).eq('id',newest.id);
+      currentTermId = newest.id;
+    } else {
+      currentTermId = null;
+    }
+    await loadTerms();
+    alert('ລົບພາກຮຽນສຳເລັດ!');
+  }catch(e){
+    setSyncStatus('⚠️ ລົບບໍ່ສຳເລັດ','var(--accent2)');
+    alert('ລົບພາກຮຽນບໍ່ສຳເລັດ: '+(e.message||e)+'\n(ກວດວ່າ login admin ແລ້ວບໍ)');
+  }
+}
+
 // ບັນທຶກຕາຕະລາງຂອງພາກຮຽນປັດຈຸບັນ — ໃຊ້ session admin (RLS ກວດ allowlist)
 async function pushToServer(){
   if(currentRole!=='admin' || !currentTermId) return;
@@ -965,6 +1006,14 @@ function renderSubjectList(){
 // ກັ່ນຕອງ / ລາຍຊື່ອາຈານ
 // ============================================================
 let teacherFilter = ''; // ວ່າງ = ສະແດງທຸກວິຊາ
+let dayFilter = '';     // ວ່າງ = ສະແດງທຸກວັນ
+
+// ກັ່ນຕອງຕາມວັນ
+function onDayFilter(){
+  const sel=document.getElementById('dayFilter');
+  dayFilter = sel ? sel.value : '';
+  rebuildTable(); // ສ້າງຕາຕະລາງຄືນ (ປ່ຽນຈຳນວນແຖວ) — ມັນ render mobile cards ນຳ
+}
 
 function teacherList(){
   const set=new Set();
@@ -1187,7 +1236,7 @@ function rebuildTable(){
   // ---- BODY ROWS ----
   const tbody=tbl.createTBody();
 
-  DAYS.forEach((day, di)=>{
+  DAYS.filter(d=>!dayFilter || d.key===dayFilter).forEach((day, di)=>{
     const periods = day.key==='wed' ? PERIOD_TIMES_WED : PERIOD_TIMES_STD;
 
     periods.forEach((period, pi)=>{
@@ -1283,7 +1332,7 @@ function renderMobileCards(){
   const cls=CLASSES.find(c=>c.id===clsId);
   container.innerHTML='';
 
-  DAYS.forEach(day=>{
+  DAYS.filter(d=>!dayFilter || d.key===dayFilter).forEach(day=>{
     const periods = day.key==='wed' ? PERIOD_TIMES_WED : PERIOD_TIMES_STD;
     const card=document.createElement('div');
     card.className='day-card';
