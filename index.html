@@ -1608,30 +1608,47 @@ function saveAsPDF(){
   });
   clone.style.background='#fff';
   clone.style.border='1px solid #ccc';
-  if(clone.tagName==='TABLE'){ clone.style.width='100%'; }
   wrapper.appendChild(clone);
 
-  // ⚠️ html2canvas ວັດ height ບໍ່ໄດ້ ຖ້າ target ເປັນ position:fixed/absolute (ໄດ້ໜ້າຂາວ).
-  // ສະນັ້ນໃຫ້ wrapper ຢູ່ໃນ flow ປົກກະຕິ (static) ແຕ່ໃສ່ໃນ container ທີ່ height:0
-  // + overflow:hidden ເພື່ອເຊື່ອງຈາກສາຍຕາ ໂດຍ wrapper ຍັງມີ layout ຄົບ.
-  const pdfW = isMobile ? '420px' : '1400px';
-  wrapper.style.width = pdfW;
+  // ຄວາມກວ້າງເຕັມຂອງເນື້ອຫາ ເພື່ອໃຫ້ເຫັນ "ທຸກ column" ບໍ່ຖືກຕັດ
+  const fullW = isMobile ? 440 : Math.max(source.scrollWidth, source.offsetWidth, 900);
+  if(clone.tagName==='TABLE'){ clone.style.width = fullW+'px'; }
+  const boxW = fullW + 32; // + padding ຊ້າຍ-ຂວາ
+  wrapper.style.width = boxW+'px';
+
+  // ⚠️ html2canvas ວັດ height ບໍ່ໄດ້ ຖ້າ target ເປັນ fixed/absolute (ໄດ້ໜ້າຂາວ).
+  // ສະນັ້ນໃຫ້ wrapper ຢູ່ flow ປົກກະຕິ (static) ໃນ container height:0 overflow:hidden.
   const hideBox = document.createElement('div');
-  hideBox.style.cssText = 'position:absolute;left:0;top:0;width:'+pdfW+';height:0;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1;';
+  hideBox.style.cssText = 'position:absolute;left:0;top:0;width:'+boxW+'px;height:0;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1;';
   hideBox.appendChild(wrapper);
   document.body.appendChild(hideBox);
 
   const done = ()=>{ if(hideBox.parentNode) document.body.removeChild(hideBox); };
-  html2pdf().set({
-    margin: 8,
+  const wrapH = wrapper.offsetHeight || 1200;
+  const worker = html2pdf().set({
     filename: 'timetable-snu.pdf',
-    image: { type:'jpeg', quality:0.98 },
-    html2canvas: { scale:2, backgroundColor:'#ffffff', useCORS:true },
-    jsPDF: { unit:'mm', format:'a4', orientation: isMobile ? 'portrait' : 'landscape' }
-  }).from(wrapper).save().then(done).catch((err)=>{
-    done();
-    alert('ເກີດຂໍ້ຜິດພາດໃນການສ້າງ PDF: '+(err && err.message ? err.message : err));
-  });
+    image: { type:'jpeg', quality:0.95 },
+    // width/windowWidth = ຄວາມກວ້າງເຕັມ ບໍ່ດັ່ງນັ້ນ html2canvas ຈະຕັດຕາມ viewport
+    html2canvas: { scale:2, backgroundColor:'#ffffff', useCORS:true, width: boxW, windowWidth: boxW, windowHeight: wrapH+40 }
+  }).from(wrapper);
+
+  (async()=>{
+    try{
+      await worker.toCanvas();
+      const c = worker.prop.canvas;
+      const ratio = (c.height && c.width) ? (c.height / c.width) : 0.6;
+      // ໜ້າດຽວພໍດີເນື້ອຫາທັງໝົດ — format ຕາມອັດຕາສ່ວນຂອງເນື້ອຫາ
+      const pageW = isMobile ? 210 : 420;            // mm
+      const pageH = +(pageW * ratio).toFixed(1);
+      worker.set({ jsPDF: { unit:'mm', format:[pageW, pageH], orientation: pageW>=pageH ? 'landscape':'portrait' } });
+      await worker.toPdf();
+      worker.prop.pdf.save('timetable-snu.pdf');
+      done();
+    }catch(err){
+      done();
+      alert('ເກີດຂໍ້ຜິດພາດໃນການສ້າງ PDF: '+(err && err.message ? err.message : err));
+    }
+  })();
 }
 
 // ກວດ session ຕອນເປີດໜ້າ (ຮອງຮັບການກັບມາຈາກ Google OAuth)
