@@ -1610,20 +1610,25 @@ function saveAsPDF(){
   clone.style.border='1px solid #ccc';
   wrapper.appendChild(clone);
 
-  // ຄວາມກວ້າງເຕັມຂອງເນື້ອຫາ ເພື່ອໃຫ້ເຫັນ "ທຸກ column" ບໍ່ຖືກຕັດ
-  const fullW = isMobile ? 440 : Math.max(source.scrollWidth, source.offsetWidth, 900);
-  if(clone.tagName==='TABLE'){ clone.style.width = fullW+'px'; }
-  const boxW = fullW + 32; // + padding ຊ້າຍ-ຂວາ
-  wrapper.style.width = boxW+'px';
+  // ໃຫ້ table ຂະຫຍາຍຕາມເນື້ອຫາຈິງ (ບໍ່ບີບ) — ຈະວັດຄວາມກວ້າງຈິງຫຼັງ render
+  if(clone.tagName==='TABLE'){ clone.style.width='max-content'; clone.style.maxWidth='none'; }
 
   // ⚠️ html2canvas ວັດ height ບໍ່ໄດ້ ຖ້າ target ເປັນ fixed/absolute (ໄດ້ໜ້າຂາວ).
   // ສະນັ້ນໃຫ້ wrapper ຢູ່ flow ປົກກະຕິ (static) ໃນ container height:0 overflow:hidden.
+  // ໃຫ້ hideBox ກວ້າງຫຼາຍໆ ເພື່ອບໍ່ໃຫ້ table ຖືກບີບ → ຖັນຂວາສຸດຈະບໍ່ຖືກຕັດ.
   const hideBox = document.createElement('div');
-  hideBox.style.cssText = 'position:absolute;left:0;top:0;width:'+boxW+'px;height:0;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1;';
+  hideBox.style.cssText = 'position:absolute;left:0;top:0;width:20000px;height:0;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1;';
   hideBox.appendChild(wrapper);
   document.body.appendChild(hideBox);
 
   const done = ()=>{ if(hideBox.parentNode) document.body.removeChild(hideBox); };
+
+  // ວັດຄວາມກວ້າງຈິງຂອງຕາຕະລາງຫຼັງ render ແລ້ວ (ກັນຖັນຂວາສຸດຖືກຕັດ)
+  const contentW = isMobile ? 440
+    : Math.ceil(Math.max(clone.scrollWidth, clone.offsetWidth, clone.getBoundingClientRect().width, 900));
+  const boxW = contentW + 32; // + padding ຊ້າຍ-ຂວາ
+  wrapper.style.width = boxW+'px';
+
   const wrapH = wrapper.offsetHeight || 1200;
   const orient = isMobile ? 'portrait' : 'landscape';
   const worker = html2pdf().set({
