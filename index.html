@@ -1648,11 +1648,14 @@ function saveAsPDF(){
       pdf.addPage('a4', orient);
       const pw = pdf.internal.pageSize.getWidth();
       const ph = pdf.internal.pageSize.getHeight();
-      const m = 6, availW = pw-2*m, availH = ph-2*m;
+      const m = 4, availW = pw-2*m, availH = ph-2*m;
       const ratio = c.width / c.height;
       let dw = availW, dh = dw/ratio;
       if(dh > availH){ dh = availH; dw = dh*ratio; }
-      pdf.addImage(c.toDataURL('image/jpeg',0.95), 'JPEG', (pw-dw)/2, (ph-dh)/2, dw, dh);
+      // ຊິດຊ້າຍ (ບໍ່ຈັດກາງ) ເພື່ອບໍ່ໃຫ້ມີຊ່ອງວ່າງເບື້ອງຊ້າຍ; ກາງສະເພາະແນວຕັ້ງ
+      const x = m;
+      const y = (ph - dh) / 2;
+      pdf.addImage(c.toDataURL('image/jpeg',0.95), 'JPEG', x, y, dw, dh);
       pdf.save('timetable-snu.pdf');
       done();
     }catch(err){
