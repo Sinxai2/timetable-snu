@@ -681,7 +681,20 @@ async function loadTerms(){
     if(pick) await loadTerm(pick);
     else setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
-    setSyncStatus('⚠️ ອອບລາຍ (ໃຊ້ຂໍ້ມູນເຄື່ອງ)','var(--accent2)');
+    // ອອບລາຍ → ໃຊ້ໄຟລ໌ສຳຮອງ data.js
+    const sts=seedTerms();
+    if(sts.length){
+      terms = sts.map(t=>({id:t.id,label:t.label,is_current:!!t.is_current,sort_order:t.sort_order||0}));
+      const sel=document.getElementById('termSelect');
+      if(sel){
+        sel.innerHTML='';
+        terms.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.label+(t.is_current?'  ·  ປັດຈຸບັນ':''); sel.appendChild(o); });
+      }
+      let pick=(currentTermId&&terms.some(t=>t.id===currentTermId))?currentTermId:((terms.find(t=>t.is_current)||terms[0]||{}).id);
+      if(sel&&pick) sel.value=pick;
+      if(pick) loadTermOffline(pick);
+    }
+    setSyncStatus('⚠️ ອອບລາຍ (ໃຊ້ໄຟລ໌ສຳຮອງ)','var(--accent2)');
   }
 }
 
@@ -703,7 +716,9 @@ async function loadTerm(id){
     renderSubjectList(); renderClassList(); renderMeta();
     setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
-    setSyncStatus('⚠️ ໂຫລດພາກຮຽນບໍ່ສຳເລັດ','var(--accent2)');
+    // ອອບລາຍ → ໃຊ້ໄຟລ໌ສຳຮອງ data.js
+    loadTermOffline(id);
+    setSyncStatus('⚠️ ອອບລາຍ (ໄຟລ໌ສຳຮອງ)','var(--accent2)');
   }
 }
 
@@ -1349,28 +1364,47 @@ function saveData(){
   saveLocal();
   schedulePush();
 }
+// ---- data.js (ໄຟລ໌ສຳຮອງ ແຍກຕາມພາກຮຽນ) ----
+function seedTerms(){
+  return (window.SNU_DATA && Array.isArray(window.SNU_DATA.terms)) ? window.SNU_DATA.terms : [];
+}
+// ນຳຂໍ້ມູນ 1 ພາກຮຽນ (object data) ມາໃສ່ state
+function applyTermData(d){
+  d = d || {};
+  subjects = Array.isArray(d.subjects) ? d.subjects.map(s=>({...s})) : [];
+  schedule = (d.schedule&&typeof d.schedule==='object') ? {...d.schedule} : {};
+  if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
+  schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester:'' };
+}
+// ໂຫລດ 1 ພາກຮຽນຈາກໄຟລ໌ສຳຮອງ (ໃຊ້ຕອນ Supabase ອອບລາຍ)
+function loadTermOffline(id){
+  const t = seedTerms().find(x=>x.id===id);
+  if(!t) return;
+  currentTermId = id;
+  applyTermData(t.data);
+  if(!schoolMeta.semester) schoolMeta.semester = t.label||'';
+  saveLocal();
+  buildColorGrid(); buildClassColorGrid(); rebuildTable();
+  renderSubjectList(); renderClassList(); renderMeta();
+}
+
+// ໂຫລດເບື້ອງຕົ້ນ (offline first paint): ໃຊ້ cache ລ່າສຸດ ຫຼື ພາກຮຽນປັດຈຸບັນຈາກໄຟລ໌
 function loadData(){
   try{
-    // Seed data from data.js is the canonical source of truth.
-    // When its version is newer than what the browser last stored,
-    // (re)load it — overwriting stale local copies so every visitor
-    // sees the same up-to-date timetable.
-    const seed = window.SNU_DATA || {};
-    const seedVer   = parseInt(seed.version || 0, 10);
-    const storedVer = parseInt(localStorage.getItem('snu_dataVersion') || '0', 10);
-    if(seedVer > storedVer){
-      if(seed.subjects) subjects = seed.subjects.map(s=>({...s}));
-      if(seed.schedule) schedule = {...seed.schedule};
-      if(seed.classes)  CLASSES  = seed.classes.map(c=>({...c}));
-      if(seed.meta)     schoolMeta = {...seed.meta};
-      localStorage.setItem('snu_dataVersion', String(seedVer));
-      saveLocal();
-      return;
+    const subs=localStorage.getItem('snu_subjects');
+    const sch =localStorage.getItem('snu_schedule');
+    const cls =localStorage.getItem('snu_classes');
+    const mta =localStorage.getItem('snu_meta');
+    if(subs||sch){
+      if(subs) subjects=JSON.parse(subs);
+      if(sch)  schedule=JSON.parse(sch);
+      if(cls)  CLASSES=JSON.parse(cls);
+      if(mta)  schoolMeta=JSON.parse(mta);
+    } else {
+      const sts=seedTerms();
+      const cur=sts.find(t=>t.is_current)||sts[0];
+      if(cur){ currentTermId=currentTermId||cur.id; applyTermData(cur.data); if(!schoolMeta.semester) schoolMeta.semester=cur.label||''; saveLocal(); }
     }
-    const subs=localStorage.getItem('snu_subjects'); if(subs) subjects=JSON.parse(subs);
-    const sch=localStorage.getItem('snu_schedule');  if(sch)  schedule=JSON.parse(sch);
-    const cls=localStorage.getItem('snu_classes');   if(cls)  CLASSES=JSON.parse(cls);
-    const mta=localStorage.getItem('snu_meta');      if(mta)  schoolMeta=JSON.parse(mta);
   }catch(e){}
 }
 
