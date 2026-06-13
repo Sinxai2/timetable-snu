@@ -1625,18 +1625,41 @@ function saveAsPDF(){
 
   const done = ()=>{ if(hideBox.parentNode) document.body.removeChild(hideBox); };
   const wrapH = wrapper.offsetHeight || 1200;
-  html2pdf().set({
+  const orient = isMobile ? 'portrait' : 'landscape';
+  const worker = html2pdf().set({
     margin: 5,
     filename: 'timetable-snu.pdf',
     image: { type:'jpeg', quality:0.95 },
     // width/windowWidth = ຄວາມກວ້າງເຕັມ ບໍ່ດັ່ງນັ້ນ html2canvas ຈະຕັດຕາມ viewport
     html2canvas: { scale:2, backgroundColor:'#ffffff', useCORS:true, width: boxW, windowWidth: boxW, windowHeight: wrapH+40 },
-    // ພໍດີ A4 ມາດຕະຖານ — ຕາຕະລາງ desktop ພໍດີ 1 ໜ້າ A4 ແນວນອນ
-    jsPDF: { unit:'mm', format:'a4', orientation: isMobile ? 'portrait' : 'landscape' }
-  }).from(wrapper).save().then(done).catch((err)=>{
-    done();
-    alert('ເກີດຂໍ້ຜິດພາດໃນການສ້າງ PDF: '+(err && err.message ? err.message : err));
-  });
+    jsPDF: { unit:'mm', format:'a4', orientation: orient }
+  }).from(wrapper);
+
+  // ວາງຕາຕະລາງທັງໝົດໃຫ້ພໍດີ 1 ໜ້າ A4 (ບີບໃຫ້ພໍດີທັງ ກວ້າງ ແລະ ສູງ, ຈັດກາງ)
+  (async()=>{
+    try{
+      await worker.toCanvas();
+      const c = worker.prop.canvas;
+      await worker.toPdf();
+      const pdf = worker.prop.pdf;
+      // ລ້າງໜ້າທີ່ html2pdf ສ້າງ (ອາດຫຼາຍໜ້າ) ແລ້ວສ້າງ 1 ໜ້າ A4 ໃໝ່
+      const n = pdf.internal.getNumberOfPages();
+      for(let i=n;i>=1;i--) pdf.deletePage(i);
+      pdf.addPage('a4', orient);
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = pdf.internal.pageSize.getHeight();
+      const m = 6, availW = pw-2*m, availH = ph-2*m;
+      const ratio = c.width / c.height;
+      let dw = availW, dh = dw/ratio;
+      if(dh > availH){ dh = availH; dw = dh*ratio; }
+      pdf.addImage(c.toDataURL('image/jpeg',0.95), 'JPEG', (pw-dw)/2, (ph-dh)/2, dw, dh);
+      pdf.save('timetable-snu.pdf');
+      done();
+    }catch(err){
+      done();
+      alert('ເກີດຂໍ້ຜິດພາດໃນການສ້າງ PDF: '+(err && err.message ? err.message : err));
+    }
+  })();
 }
 
 // ກວດ session ຕອນເປີດໜ້າ (ຮອງຮັບການກັບມາຈາກ Google OAuth)
