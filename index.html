@@ -1611,22 +1611,25 @@ function saveAsPDF(){
   if(clone.tagName==='TABLE'){ clone.style.width='100%'; }
   wrapper.appendChild(clone);
 
-  document.body.appendChild(wrapper);
-  wrapper.style.position='fixed';
-  wrapper.style.left='-99999px';
-  wrapper.style.top='0';
-  wrapper.style.width = isMobile ? '420px' : '1400px';
+  // ⚠️ html2canvas ວັດ height ບໍ່ໄດ້ ຖ້າ target ເປັນ position:fixed/absolute (ໄດ້ໜ້າຂາວ).
+  // ສະນັ້ນໃຫ້ wrapper ຢູ່ໃນ flow ປົກກະຕິ (static) ແຕ່ໃສ່ໃນ container ທີ່ height:0
+  // + overflow:hidden ເພື່ອເຊື່ອງຈາກສາຍຕາ ໂດຍ wrapper ຍັງມີ layout ຄົບ.
+  const pdfW = isMobile ? '420px' : '1400px';
+  wrapper.style.width = pdfW;
+  const hideBox = document.createElement('div');
+  hideBox.style.cssText = 'position:absolute;left:0;top:0;width:'+pdfW+';height:0;overflow:hidden;opacity:0.01;pointer-events:none;z-index:-1;';
+  hideBox.appendChild(wrapper);
+  document.body.appendChild(hideBox);
 
+  const done = ()=>{ if(hideBox.parentNode) document.body.removeChild(hideBox); };
   html2pdf().set({
     margin: 8,
     filename: 'timetable-snu.pdf',
     image: { type:'jpeg', quality:0.98 },
     html2canvas: { scale:2, backgroundColor:'#ffffff', useCORS:true },
     jsPDF: { unit:'mm', format:'a4', orientation: isMobile ? 'portrait' : 'landscape' }
-  }).from(wrapper).save().then(()=>{
-    document.body.removeChild(wrapper);
-  }).catch((err)=>{
-    document.body.removeChild(wrapper);
+  }).from(wrapper).save().then(done).catch((err)=>{
+    done();
     alert('ເກີດຂໍ້ຜິດພາດໃນການສ້າງ PDF: '+(err && err.message ? err.message : err));
   });
 }
