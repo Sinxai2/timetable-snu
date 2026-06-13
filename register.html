@@ -87,12 +87,16 @@ body::before{content:'';position:fixed;inset:0;background:
             <span class="role-box"><span class="ic">👨‍🏫</span>ອາຈານ</span></label>
         </div>
       </div>
+      <div class="field">
+        <label>ຊື່ຜູ້ໃຊ້ <span style="text-transform:none;letter-spacing:0;color:var(--text-muted)">(ໃຊ້ login, a-z 0-9 . _ )</span></label>
+        <input type="text" id="username" placeholder="ເຊັ່ນ: souphan2026" autocomplete="username">
+      </div>
     </div>
 
-    <!-- ຊ່ອງຮ່ວມ (email + password) -->
+    <!-- ຊ່ອງຮ່ວມ (email/username + password) -->
     <div class="field">
-      <label>ອີເມວ</label>
-      <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+      <label id="emailLabel">ອີເມວ</label>
+      <input type="text" id="email" placeholder="you@example.com" autocomplete="email">
     </div>
     <div class="field">
       <label>ລະຫັດຜ່ານ <span id="pwHint" style="text-transform:none;letter-spacing:0;color:var(--text-muted)">(ຢ່າງໜ້ອຍ 6 ໂຕ)</span></label>
@@ -128,6 +132,8 @@ function setMode(m){
   document.getElementById('submitBtn').textContent = isSignup ? 'ສະໝັກສະມາຊິກ' : 'ເຂົ້າສູ່ລະບົບ';
   document.getElementById('password').setAttribute('autocomplete', isSignup?'new-password':'current-password');
   document.getElementById('pwHint').style.display = isSignup ? '' : 'none';
+  document.getElementById('emailLabel').textContent = isSignup ? 'ອີເມວ' : 'ອີເມວ ຫຼື ຊື່ຜູ້ໃຊ້';
+  document.getElementById('email').placeholder = isSignup ? 'you@example.com' : 'ອີເມວ ຫຼື ຊື່ຜູ້ໃຊ້';
   document.getElementById('footText').textContent = isSignup ? 'ມີບັນຊີແລ້ວ?' : 'ຍັງບໍ່ມີບັນຊີ?';
   document.getElementById('footLink').textContent = isSignup ? 'ເຂົ້າສູ່ລະບົບ' : 'ສະໝັກສະມາຊິກ';
   setMsg('');
@@ -146,27 +152,32 @@ function getRole(){
 }
 
 async function submitForm(){
-  const email = document.getElementById('email').value.trim();
+  const idInput = document.getElementById('email').value.trim();  // signup=email · login=email ຫຼື username
   const password = document.getElementById('password').value;
   const btn = document.getElementById('submitBtn');
-
-  if(!email || !password){ setMsg('❌ ກະລຸນາໃສ່ອີເມວ ແລະ ລະຫັດຜ່ານ','err'); return; }
 
   if(mode==='signup'){
     const fullName = document.getElementById('fullName').value.trim();
     const phone = document.getElementById('phone').value.trim();
+    const username = document.getElementById('username').value.trim();
+    const email = idInput;
     if(!fullName){ setMsg('❌ ກະລຸນາໃສ່ຊື່-ນາມສະກຸນ','err'); return; }
+    if(!/^[a-zA-Z0-9._]{3,20}$/.test(username)){ setMsg('❌ ຊື່ຜູ້ໃຊ້ຕ້ອງເປັນ a-z 0-9 . _ ຍາວ 3-20 ໂຕ','err'); return; }
+    if(!email){ setMsg('❌ ກະລຸນາໃສ່ອີເມວ','err'); return; }
     if(password.length < 6){ setMsg('❌ ລະຫັດຜ່ານຕ້ອງຍາວຢ່າງໜ້ອຍ 6 ໂຕ','err'); return; }
 
     btn.disabled = true; setMsg('⏳ ກຳລັງສະໝັກ...');
+    // ກວດຊື່ຜູ້ໃຊ້ຊ້ຳກ່ອນ
+    const { data:avail, error:availErr } = await sb.rpc('username_available', { p_username: username });
+    if(!availErr && avail === false){ btn.disabled=false; setMsg('❌ ຊື່ຜູ້ໃຊ້ "'+username+'" ຖືກໃຊ້ແລ້ວ — ກະລຸນາເລືອກອັນອື່ນ','err'); return; }
+
     const { data, error } = await sb.auth.signUp({
       email, password,
-      options:{ data:{ full_name:fullName, phone, role:getRole() } }
+      options:{ data:{ full_name:fullName, phone, role:getRole(), username } }
     });
     btn.disabled = false;
     if(error){ setMsg('❌ '+laoErr(error.message),'err'); return; }
 
-    // ມີ session ທັນທີ = email confirmation ປິດ → ເຂົ້າເລີຍ
     if(data.session){
       setMsg('✅ ສະໝັກສຳເລັດ! ກຳລັງເຂົ້າສູ່ລະບົບ...','ok');
       setTimeout(()=>{ location.href='index.html'; }, 900);
@@ -175,7 +186,17 @@ async function submitForm(){
       setMode('login');
     }
   } else {
+    if(!idInput || !password){ setMsg('❌ ກະລຸນາໃສ່ອີເມວ/ຊື່ຜູ້ໃຊ້ ແລະ ລະຫັດຜ່ານ','err'); return; }
     btn.disabled = true; setMsg('⏳ ກຳລັງເຂົ້າສູ່ລະບົບ...');
+
+    // ຖ້າບໍ່ແມ່ນ email (ບໍ່ມີ @) → ແປງ username ເປັນ email ກ່ອນ
+    let email = idInput;
+    if(!idInput.includes('@')){
+      const { data:foundEmail, error:rpcErr } = await sb.rpc('email_for_username', { p_username: idInput });
+      if(rpcErr || !foundEmail){ btn.disabled=false; setMsg('❌ ບໍ່ພົບຊື່ຜູ້ໃຊ້ນີ້','err'); return; }
+      email = foundEmail;
+    }
+
     const { error } = await sb.auth.signInWithPassword({ email, password });
     btn.disabled = false;
     if(error){ setMsg('❌ '+laoErr(error.message),'err'); return; }
