@@ -174,7 +174,8 @@
         <div id="teacherPanel">
           <hr>
           <div class="section-lbl">👨‍🏫 ລາຍຊື່ອາຈານ</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">ກົດຊື່ອາຈານ ເພື່ອເບິ່ງສະເພາະວິຊາທີ່ອາຈານນັ້ນສອນ (ກົດຊ້ຳເພື່ອຍົກເລີກ)</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">ຄົ້ນຫາ ຫຼື ກົດຊື່ອາຈານ ເພື່ອເບິ່ງສະເພາະວິຊາທີ່ອາຈານນັ້ນສອນ (ກົດຊ້ຳເພື່ອຍົກເລີກ)</div>
+          <input id="teacherSearch" oninput="renderTeacherList()" placeholder="🔍 ຄົ້ນຫາຊື່ອາຈານຂອງທ່ານ" autocomplete="off" style="width:100%;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;outline:none;margin-bottom:8px">
           <div class="subject-list" id="teacherList"></div>
         </div>
         <hr>
@@ -197,7 +198,9 @@
         </div>
         <div id="teacherFilterWrap" style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:var(--text-muted)">👨‍🏫 ອາຈານ:</span>
-          <select id="teacherFilter" onchange="onTeacherFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:200px"></select>
+          <input id="teacherFilter" list="teacherDatalist" oninput="onTeacherFilter()" placeholder="🔍 ຄົ້ນຫາ/ເລືອກຊື່" autocomplete="off" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:200px">
+          <datalist id="teacherDatalist"></datalist>
+          <button class="btn btn-ghost btn-sm" title="ລ້າງ" onclick="clearTeacherFilter()" style="padding:4px 8px">✕</button>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:var(--text-muted)">🎓 ຊັ້ນປີ:</span>
@@ -796,30 +799,39 @@ function teacherList(){
 function subjectVisible(sub){
   return !teacherFilter || (sub && sub.teacher===teacherFilter);
 }
-// ສ້າງ dropdown ກັ່ນຕອງອາຈານ
+// ສ້າງລາຍການຊື່ອາຈານໃຫ້ຊ່ອງຄົ້ນຫາ (datalist)
 function buildTeacherFilter(){
-  const sel=document.getElementById('teacherFilter');
-  if(!sel) return;
+  const el=document.getElementById('teacherFilter');
+  const dl=document.getElementById('teacherDatalist');
+  if(!el||!dl) return;
   const names=teacherList();
-  sel.innerHTML='';
-  const all=document.createElement('option'); all.value=''; all.textContent='ທັງໝົດ'; sel.appendChild(all);
-  names.forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o); });
-  if(teacherFilter && names.includes(teacherFilter)) sel.value=teacherFilter;
-  else { teacherFilter=''; sel.value=''; }
+  dl.innerHTML='';
+  names.forEach(n=>{ const o=document.createElement('option'); o.value=n; dl.appendChild(o); });
+  if(teacherFilter && names.includes(teacherFilter)){ if(document.activeElement!==el) el.value=teacherFilter; }
+  else { teacherFilter=''; if(document.activeElement!==el) el.value=''; }
 }
 function onTeacherFilter(){
-  const sel=document.getElementById('teacherFilter');
-  teacherFilter = sel ? sel.value : '';
+  const el=document.getElementById('teacherFilter');
+  const v=el?el.value.trim():'';
+  const names=teacherList();
+  teacherFilter = names.includes(v) ? v : '';  // ກັ່ນຕອງເມື່ອກົງຊື່ເທົ່ານັ້ນ
   renderCells();
   renderTeacherList();
+}
+function clearTeacherFilter(){
+  teacherFilter='';
+  const el=document.getElementById('teacherFilter'); if(el) el.value='';
+  renderCells(); renderTeacherList();
 }
 // ລາຍຊື່ອາຈານ (ກົດເພື່ອກັ່ນຕອງ)
 function renderTeacherList(){
   const el=document.getElementById('teacherList');
   if(!el) return;
-  const names=teacherList();
+  const q=((document.getElementById('teacherSearch')||{}).value||'').trim().toLowerCase();
+  let names=teacherList();
+  if(q) names=names.filter(n=>n.toLowerCase().includes(q));
   el.innerHTML='';
-  if(names.length===0){ el.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:6px 0">ຍັງບໍ່ມີຂໍ້ມູນອາຈານ</div>'; return; }
+  if(names.length===0){ el.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:6px 0">'+(q?'ບໍ່ພົບອາຈານ "'+q+'"':'ຍັງບໍ່ມີຂໍ້ມູນອາຈານ')+'</div>'; return; }
   names.forEach(n=>{
     const count=subjects.filter(s=>s.teacher===n).length;
     const active=(n===teacherFilter);
