@@ -33,7 +33,7 @@ body::before{content:'';position:fixed;inset:0;background:
 .hint-block strong{color:var(--text);}
 
 /* APP */
-.app{position:relative;z-index:1;display:flex;flex-direction:column;min-height:100vh;}
+.app{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:rgba(18,10,12,.93);backdrop-filter:blur(16px);position:sticky;top:0;z-index:100;}
 .hd-logo{font-family:'Bebas Neue',cursive;font-size:20px;letter-spacing:3px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .hd-center{font-size:13px;color:var(--text-muted);}
@@ -53,10 +53,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .btn-logout:hover{background:rgba(255,101,132,.2);}
 
 /* MAIN LAYOUT */
-main{display:grid;grid-template-columns:260px 1fr;flex:1;height:calc(100vh - 50px);}
+main{display:grid;grid-template-columns:260px 1fr;grid-template-rows:minmax(0,1fr);flex:1;min-height:0;height:calc(100vh - 50px);}
 
 /* SIDEBAR */
-aside{background:var(--surface);border-right:1px solid var(--border);padding:18px 14px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;}
+aside{background:var(--surface);border-right:1px solid var(--border);padding:18px 14px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;min-height:0;}
 .section-lbl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
 .field-row{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
 .field-row label{font-size:11px;color:var(--text-muted);font-weight:600;}
@@ -81,11 +81,11 @@ aside{background:var(--surface);border-right:1px solid var(--border);padding:18p
 hr{border-color:var(--border);margin:2px 0;}
 
 /* ===================== TIMETABLE AREA ===================== */
-.tt-area{padding:16px 20px;overflow:auto;display:flex;flex-direction:column;gap:14px;background:var(--bg);}
-.tt-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.tt-area{padding:16px 20px;overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:14px;background:var(--bg);}
+.tt-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;}
 .school-title{font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:2px;color:var(--text);}
 .semester-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(165,28,48,.15);color:var(--accent);border:1px solid rgba(165,28,48,.3);}
-.tt-scroll{overflow:auto;border-radius:12px;border:1px solid var(--border);}
+.tt-scroll{flex:1;min-height:0;overflow:auto;border-radius:12px;border:1px solid var(--border);}
 
 /* Mobile picker + card view (hidden on desktop) */
 .mobile-picker{display:none;}
@@ -266,8 +266,10 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
 
 /* RESPONSIVE */
 @media(max-width:900px){
-  main{grid-template-columns:1fr;}
-  aside{max-height:300px;border-right:none;border-bottom:1px solid var(--border);}
+  .app{height:auto;overflow:visible;}
+  main{grid-template-columns:1fr;grid-template-rows:auto;height:auto;}
+  aside{max-height:300px;border-right:none;border-bottom:1px solid var(--border);min-height:auto;}
+  .tt-area{overflow:visible;}
 }
 
 @media(max-width:600px){
@@ -275,7 +277,7 @@ tr.day-first-row td, tr.day-first-row th{border-top:2px solid var(--border);}
   header{padding:10px 12px;}
   .hd-logo{font-size:18px;}
 
-  .tt-area{padding:10px 8px;gap:10px;}
+  .tt-area{padding:10px 8px;gap:10px;overflow:auto;}
   .tt-top{gap:8px;}
   .school-title{font-size:15px;}
   .semester-badge{font-size:10px;padding:3px 10px;}

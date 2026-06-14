@@ -197,6 +197,16 @@
           <select id="teacherFilter" onchange="onTeacherFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none;max-width:200px"></select>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;color:var(--text-muted)">🎓 ຊັ້ນປີ:</span>
+          <select id="yearFilter" onchange="onYearFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none">
+            <option value="">ທຸກປີ</option>
+            <option value="1">ປີ 1</option>
+            <option value="2">ປີ 2</option>
+            <option value="3">ປີ 3</option>
+            <option value="4">ປີ 4</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:11px;color:var(--text-muted)">📆 ວັນ:</span>
           <select id="dayFilter" onchange="onDayFilter()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none">
             <option value="">ທັງໝົດ</option>
@@ -730,12 +740,20 @@ function renderSubjectList(){
 // ============================================================
 let teacherFilter = ''; // ວ່າງ = ສະແດງທຸກວິຊາ
 let dayFilter = '';     // ວ່າງ = ສະແດງທຸກວັນ
+let yearFilter = '';    // ວ່າງ = ສະແດງທຸກຊັ້ນປີ
 
 // ກັ່ນຕອງຕາມວັນ
 function onDayFilter(){
   const sel=document.getElementById('dayFilter');
   dayFilter = sel ? sel.value : '';
   rebuildTable(); // ສ້າງຕາຕະລາງຄືນ (ປ່ຽນຈຳນວນແຖວ) — ມັນ render mobile cards ນຳ
+}
+
+// ກັ່ນຕອງຕາມຊັ້ນປີ (ໃຫ້ຈັດ/ເບິ່ງ ປີໃດໜຶ່ງ ໄດ້ງ່າຍ)
+function onYearFilter(){
+  const sel=document.getElementById('yearFilter');
+  yearFilter = sel ? sel.value : '';
+  rebuildTable();
 }
 
 function teacherList(){
@@ -909,6 +927,9 @@ function rebuildTable(){
   // appear grouped with their year instead of at the far right end.
   CLASSES.sort((a,b)=> a.year-b.year || a.name.localeCompare(b.name));
 
+  // ກັ່ນຕອງຕາມຊັ້ນປີ — ສະແດງສະເພາະຖັນຂອງປີທີ່ເລືອກ (ໃຫ້ຈັດ/ເບິ່ງປີ4 ງ່າຍ ບໍ່ຕ້ອງເລື່ອນໄກ)
+  const cols = CLASSES.filter(c=> !yearFilter || String(c.year)===String(yearFilter));
+
   // ---- HEADER: 2 rows -> year groups (colspan) + class columns ----
   const thead=tbl.createTHead();
 
@@ -927,7 +948,7 @@ function rebuildTable(){
 
   // Count classes per year in display order (CLASSES already sorted by year)
   const yearOrder=[]; const yearCounts={};
-  CLASSES.forEach(c=>{
+  cols.forEach(c=>{
     if(!(c.year in yearCounts)){ yearOrder.push(c.year); yearCounts[c.year]=0; }
     yearCounts[c.year]++;
   });
@@ -943,11 +964,11 @@ function rebuildTable(){
   // ROW 2: class headers
   const hrow=thead.insertRow();
   hrow.className='class-header-row';
-  CLASSES.forEach((cls, ci)=>{
+  cols.forEach((cls, ci)=>{
     const th=document.createElement('th');
     th.className='class-th';
     // mark the last column of each year group for a thicker separator
-    const isYearEnd = ci===CLASSES.length-1 || CLASSES[ci+1].year!==cls.year;
+    const isYearEnd = ci===cols.length-1 || cols[ci+1].year!==cls.year;
     if(isYearEnd) th.classList.add('year-end');
     th.innerHTML=`<div class="class-th-inner" style="background:${cls.color}">
       <div class="class-name">${cls.id}</div>
@@ -975,9 +996,9 @@ function rebuildTable(){
         <div class="period-time">${period.start}<br>${period.end}</div>`;
 
       // Slot cells for each class
-      CLASSES.forEach((cls, ci)=>{
+      cols.forEach((cls, ci)=>{
         const cell=row.insertCell();
-        const isYearEnd = ci===CLASSES.length-1 || CLASSES[ci+1].year!==cls.year;
+        const isYearEnd = ci===cols.length-1 || cols[ci+1].year!==cls.year;
         cell.className='slot'+(currentRole!=='admin'?' ro':'')+(isYearEnd?' year-end':'');
         const key=`${day.key}-${cls.id}-${pi}`;
         cell.dataset.key=key;
@@ -1002,7 +1023,7 @@ function rebuildTable(){
         <div class="period-time">${WED_LABOR_TIME.start}<br>${WED_LABOR_TIME.end}</div>`;
       // merged cell spanning all classes
       const wcell=document.createElement('td');
-      wcell.colSpan=CLASSES.length;
+      wcell.colSpan=cols.length;
       wcell.style.cssText=`
         border:2px solid #43e97b55;
         border-top:2px solid #43e97b55;
