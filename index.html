@@ -112,6 +112,10 @@
             <input type="text" id="subTeacher" placeholder="ຊື່ອາຈານ">
           </div>
           <div class="field-row">
+            <label>ໜ່ວຍກິດ</label>
+            <input type="number" id="subCredit" min="0" step="1" placeholder="ເຊັ່ນ 3">
+          </div>
+          <div class="field-row">
             <label>ສີ</label>
             <div class="color-grid" id="colorGrid"></div>
           </div>
@@ -682,18 +686,21 @@ function buildClassColorGrid(){
 function addSubject(){
   const name=document.getElementById('subName').value.trim();
   if(!name){alert('ກະລຸນາໃສ່ຊື່ວິຊາ');return;}
+  const creditRaw=document.getElementById('subCredit').value.trim();
   subjects.push({
     id:Date.now(),
     code:document.getElementById('subCode').value.trim(),
     name,
     room:document.getElementById('subRoom').value.trim(),
     teacher:document.getElementById('subTeacher').value.trim(),
+    credit:(creditRaw===''?null:Number(creditRaw)),
     color:pickedColor
   });
   document.getElementById('subCode').value='';
   document.getElementById('subName').value='';
   document.getElementById('subRoom').value='';
   document.getElementById('subTeacher').value='';
+  document.getElementById('subCredit').value='';
   renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
 }
 function delSubject(id){
@@ -710,8 +717,9 @@ function renderSubjectList(){
   subjects.forEach(s=>{
     const div=document.createElement('div');
     div.className='subject-chip';
+    const metaBits=[s.room, s.teacher, (s.credit!=null&&s.credit!=='')?s.credit+' ໜ່ວຍກິດ':''].filter(Boolean);
     div.innerHTML=`<div class="chip-dot" style="background:${s.color}"></div>
-      <div style="flex:1"><div class="chip-name">${s.code?s.code+' ':''} ${s.name}</div>${(s.room||s.teacher)?`<div class="chip-room">${[s.room,s.teacher].filter(Boolean).join(' · ')}</div>`:''}</div>
+      <div style="flex:1"><div class="chip-name">${s.code?s.code+' ':''} ${s.name}</div>${metaBits.length?`<div class="chip-room">${metaBits.join(' · ')}</div>`:''}</div>
       ${currentRole==='admin'?`<button class="chip-del" onclick="delSubject(${s.id})">✕</button>`:''}`;
     el.appendChild(div);
   });
@@ -1081,7 +1089,7 @@ function renderMobileCards(){
         content.innerHTML=`<div class="dc-sub">
           ${sub.code?`<span class="dc-sub-meta">${sub.code}</span>`:''}
           <span class="dc-sub-name">${sub.name}</span>
-          ${[sub.room, sub.teacher?'👨‍🏫 '+sub.teacher:''].filter(Boolean).map(x=>`<span class="dc-sub-meta">${x}</span>`).join('')}
+          ${[(sub.credit!=null&&sub.credit!=='')?'📘 '+sub.credit+' ໜ່ວຍກິດ':'', sub.room, sub.teacher?'👨‍🏫 '+sub.teacher:''].filter(Boolean).map(x=>`<span class="dc-sub-meta">${x}</span>`).join('')}
         </div>`;
       } else {
         content.innerHTML='<span class="dc-empty">ບໍ່ມີຮຽນ</span>';
@@ -1126,6 +1134,7 @@ function renderCell(cell, key){
     d.style.color=isDark(sub.color)?'#fff':'#111';
     d.innerHTML=`${sub.code?`<span class="slot-code">${sub.code}</span>`:''}
       <span>${sub.name}</span>
+      ${(sub.credit!=null&&sub.credit!=='')?`<span class="slot-room">📘 ${sub.credit} ໜ່ວຍກິດ</span>`:''}
       ${sub.room?`<span class="slot-room">${sub.room}</span>`:''}
       ${sub.teacher?`<span class="slot-room">👨‍🏫 ${sub.teacher}</span>`:''}`;
     cell.appendChild(d);
@@ -1163,8 +1172,9 @@ function openModal(key, dayLabel, clsId, periodNum){
       const btn=document.createElement('button');
       btn.className='sub-opt-btn'+(isSel?' sel':'');
       if(isSel){btn.style.background=s.color+'33';btn.style.borderColor=s.color;}
+      const mbits=[s.room, s.teacher, (s.credit!=null&&s.credit!=='')?s.credit+' ໜ່ວຍກິດ':''].filter(Boolean);
       btn.innerHTML=`<div style="width:9px;height:9px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
-        <div><div style="font-weight:700">${s.code?s.code+' ':''} ${s.name}</div>${(s.room||s.teacher)?`<div style="font-size:9px;opacity:.7">${[s.room,s.teacher].filter(Boolean).join(' · ')}</div>`:''}</div>`;
+        <div><div style="font-weight:700">${s.code?s.code+' ':''} ${s.name}</div>${mbits.length?`<div style="font-size:9px;opacity:.7">${mbits.join(' · ')}</div>`:''}</div>`;
       btn.onclick=()=>selectSubject(s.id);
       body.appendChild(btn);
     });
