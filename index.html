@@ -16,6 +16,7 @@
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-brand">
+      <img class="brand-logo" src="logo.png" alt="ໂລໂກ້ ມະຫາວິທະຍາໄລ ສຸພານຸວົງ">
       <div class="logo-text">SNU TIMETABLE</div>
       <div class="logo-sub">ຕາຕະລາງການຮຽນ-ການສອນ<br>ຄະນະວິສະວະກຳສາດ ມ.ສ ສຸພານຸວົງ</div>
     </div>
@@ -55,7 +56,7 @@
 <!-- APP -->
 <div class="app" id="app" style="display:none">
   <header>
-    <div class="hd-logo">SNU · TT</div>
+    <div class="hd-logo"><img class="hd-logo-img" src="logo.png" alt="ມ.ສ">SNU · TT</div>
     <div class="hd-center" id="semLabel"></div>
     <div class="hd-right">
       <span id="syncStatus" style="font-size:11px;font-weight:600"></span>
@@ -767,7 +768,7 @@ function renderTeacherList(){
     const div=document.createElement('div');
     div.className='subject-chip';
     div.style.cursor='pointer';
-    if(active){ div.style.borderColor='var(--accent)'; div.style.background='rgba(108,99,255,.12)'; }
+    if(active){ div.style.borderColor='var(--accent)'; div.style.background='rgba(165,28,48,.12)'; }
     div.innerHTML=`<div class="chip-dot" style="background:var(--accent)"></div>
       <div style="flex:1"><div class="chip-name">${n}</div><div class="chip-room">${count} ວິຊາ</div></div>
       ${active?'<span style="color:var(--accent);font-size:11px">✓</span>':''}`;
