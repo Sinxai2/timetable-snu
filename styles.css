@@ -83,7 +83,7 @@ hr{border-color:var(--border);margin:2px 0;}
 /* ===================== TIMETABLE AREA ===================== */
 .tt-area{padding:16px 20px;overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:14px;background:var(--bg);}
 .tt-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;}
-.school-title{font-family:'Bebas Neue',cursive;font-size:18px;letter-spacing:2px;color:var(--text);}
+.school-title{font-family:'Noto Sans Lao',sans-serif;font-weight:700;font-size:17px;letter-spacing:.3px;color:var(--text);}
 .semester-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(165,28,48,.15);color:var(--accent);border:1px solid rgba(165,28,48,.3);}
 .tt-scroll{flex:1;min-height:0;overflow:auto;border-radius:12px;border:1px solid var(--border);}
 
