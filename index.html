@@ -105,7 +105,8 @@
           </div>
           <div class="field-row">
             <label>ຫ້ອງຮຽນ</label>
-            <input type="text" id="subRoom" placeholder="R101">
+            <input type="text" id="subRoom" placeholder="R101" list="roomOptions">
+            <datalist id="roomOptions"></datalist>
           </div>
           <div class="field-row">
             <label>ອາຈານຜູ້ສອນ</label>
@@ -127,6 +128,19 @@
         <div>
           <div class="section-lbl">📋 ລາຍການວິຊາ</div>
           <div class="subject-list" id="subjectList"></div>
+        </div>
+        <hr>
+        <div>
+          <div class="section-lbl">🚪 ຈັດການຫ້ອງຮຽນ</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">ເພີ່ມ/ແກ້ໄຂ ລາຍຊື່ຫ້ອງຮຽນ ເພື່ອເລືອກຕອນຈັດຕາຕະລາງ ແລະ ກວດການທັບຊ້ອນ</div>
+          <div class="field-row" style="display:flex;gap:6px;align-items:flex-end">
+            <div style="flex:1">
+              <label>ຊື່ຫ້ອງ (ເຊັ່ນ R203)</label>
+              <input type="text" id="roomName" placeholder="R203" onkeydown="if(event.key==='Enter')addRoom()">
+            </div>
+            <button class="btn btn-primary" style="white-space:nowrap" onclick="addRoom()">+ ເພີ່ມ</button>
+          </div>
+          <div class="subject-list" id="roomList" style="margin-top:10px"></div>
         </div>
         <hr>
         <div>
@@ -247,6 +261,10 @@
   <div class="modal">
     <div class="modal-title" id="modalTitle"></div>
     <div class="modal-sub" id="modalSub"></div>
+    <div id="modalRoomWrap" style="display:flex;align-items:center;gap:8px;margin:6px 0 10px">
+      <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">🚪 ຫ້ອງຮຽນ:</span>
+      <select id="modalRoom" style="flex:1;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none"></select>
+    </div>
     <div class="sub-opts" id="modalBody"></div>
     <div class="modal-actions">
       <button class="btn btn-danger" onclick="clearCell()">ລຶບ</button>
@@ -338,6 +356,8 @@ const WED_LABOR_TIME = {start:'13:00', end:'15:30'};
 let currentRole = '';
 let subjects    = [];
 let schedule    = {}; // key: "dayKey-classId-periodIndex" => subjectId
+let roomSchedule= {}; // key ດຽວກັນ => ຊື່ຫ້ອງ (override; ວ່າງ = ໃຊ້ຫ້ອງເລີ່ມຕົ້ນຂອງວິຊາ)
+let ROOMS       = []; // ລາຍຊື່ຫ້ອງຮຽນ (ແກ້ໄຂໄດ້ໂດຍ admin) — array ຂອງ string
 let schoolMeta  = { semester: 'ພາກຮຽນທີ II · 2025-2026' }; // ສົກຮຽນ/ພາກຮຽນ (ແກ້ໄຂໄດ້)
 let pickedColor = COLORS[0];
 let activeCell  = null;
@@ -434,12 +454,14 @@ async function loadTerm(id){
     const d=row.data||{};
     subjects = Array.isArray(d.subjects) ? d.subjects.map(s=>({...s})) : [];
     schedule = (d.schedule&&typeof d.schedule==='object') ? {...d.schedule} : {};
+    roomSchedule = (d.roomSchedule&&typeof d.roomSchedule==='object') ? {...d.roomSchedule} : {};
+    ROOMS = Array.isArray(d.rooms) ? d.rooms.slice() : [];
     if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
     schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester: row.label||'' };
     if(!schoolMeta.semester) schoolMeta.semester = row.label||'';
     saveLocal();
     buildColorGrid(); buildClassColorGrid(); rebuildTable();
-    renderSubjectList(); renderClassList(); renderMeta(); refreshTeacherUI();
+    renderSubjectList(); renderRoomList(); renderClassList(); renderMeta(); refreshTeacherUI();
     setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
     // ອອບລາຍ → ໃຊ້ໄຟລ໌ສຳຮອງ data.js
@@ -461,8 +483,8 @@ async function createTerm(){
   if(!label || !label.trim()) return;
   const copy=confirm('ສຳເນົາ "ສາຂາ + ວິຊາ" ຈາກພາກຮຽນປັດຈຸບັນບໍ?\n(ຕາຕະລາງຈະວ່າງ ໃຫ້ຈັດໃໝ່)\n\nOK = ສຳເນົາ · Cancel = ເລີ່ມວ່າງລ້າ');
   const newData = copy
-    ? { subjects:subjects.map(s=>({...s})), schedule:{}, classes:CLASSES.map(c=>({...c})), meta:{semester:label.trim()} }
-    : { subjects:[], schedule:{}, classes:null, meta:{semester:label.trim()} };
+    ? { subjects:subjects.map(s=>({...s})), schedule:{}, roomSchedule:{}, rooms:ROOMS.slice(), classes:CLASSES.map(c=>({...c})), meta:{semester:label.trim()} }
+    : { subjects:[], schedule:{}, roomSchedule:{}, rooms:[], classes:null, meta:{semester:label.trim()} };
   const id='t-'+Date.now();
   try{
     setSyncStatus('☁️ ກຳລັງສ້າງ…','var(--text-muted)');
@@ -520,7 +542,7 @@ async function pushToServer(){
     const label = (schoolMeta&&schoolMeta.semester)||'';
     const { error } = await sb.from('terms').update({
       label,
-      data:{ subjects, schedule, classes:CLASSES, meta:schoolMeta },
+      data:{ subjects, schedule, roomSchedule, rooms:ROOMS, classes:CLASSES, meta:schoolMeta },
       version:newVersion,
       updated_at:new Date().toISOString()
     }).eq('id',currentTermId);
@@ -619,6 +641,7 @@ function startApp(role, chipLabel){
   buildClassColorGrid();
   rebuildTable();
   renderSubjectList();
+  renderRoomList();
   renderClassList();
   renderMeta();
   refreshTeacherUI();
@@ -750,7 +773,7 @@ function cancelEditSubject(){
 function delSubject(id){
   if(!confirm('ລຶບວິຊານີ້?'))return;
   subjects=subjects.filter(s=>s.id!==id);
-  Object.keys(schedule).forEach(k=>{if(schedule[k]===id)delete schedule[k];});
+  Object.keys(schedule).forEach(k=>{if(schedule[k]===id){delete schedule[k]; delete roomSchedule[k];}});
   renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
 }
 function renderSubjectList(){
@@ -853,6 +876,92 @@ function renderTeacherList(){
 function refreshTeacherUI(){ buildTeacherFilter(); renderTeacherList(); }
 
 // ============================================================
+// ROOM (ຫ້ອງຮຽນ) MANAGEMENT + ກວດທັບຊ້ອນ
+// ============================================================
+// ຫ້ອງທີ່ໃຊ້ຈິງຂອງຊ່ອງ key ໜຶ່ງ: override ໃນ roomSchedule ກ່ອນ, ບໍ່ດັ່ງນັ້ນເອົາຫ້ອງຂອງວິຊາ
+function effectiveRoom(key){
+  const sid = schedule[key];
+  if(sid===undefined || sid===null) return '';
+  const ov = roomSchedule[key];
+  if(ov && String(ov).trim()) return String(ov).trim();
+  const sub = subjects.find(s=>s.id===sid);
+  return (sub && sub.room) ? String(sub.room).trim() : '';
+}
+// ຫາຊ່ອງອື່ນທີ່ໃຊ້ຫ້ອງດຽວກັນ ໃນວັນ+ຄາບດຽວກັນ (ຍົກເວັ້ນ key ທີ່ໃຫ້ມາ)
+function roomConflicts(key, room){
+  if(!room || !String(room).trim()) return [];
+  const target = String(room).trim().toLowerCase();
+  const p = key.split('-');           // [dayKey, classId, periodIndex]
+  const day = p[0], per = p[2];
+  const out = [];
+  Object.keys(schedule).forEach(k=>{
+    if(k===key) return;
+    const q = k.split('-');
+    if(q[0]===day && q[2]===per && effectiveRoom(k).toLowerCase()===target) out.push(k);
+  });
+  return out;
+}
+// ຄຳອະທິບາຍສັ້ນຂອງຊ່ອງ (ສຳລັບຂໍ້ຄວາມເຕືອນ): "ສາຂາ · ຊື່ວິຊາ"
+function cellDesc(key){
+  const sub = subjects.find(s=>s.id===schedule[key]);
+  return `${key.split('-')[1]} · ${sub?sub.name:'?'}`;
+}
+
+function renderRoomList(){
+  // datalist ສຳລັບຊ່ອງ "ຫ້ອງຮຽນ" ໃນຟອມວິຊາ
+  const dl=document.getElementById('roomOptions');
+  if(dl) dl.innerHTML=ROOMS.map(r=>`<option value="${r}"></option>`).join('');
+  const el=document.getElementById('roomList');
+  if(!el) return;
+  el.innerHTML='';
+  if(ROOMS.length===0){ el.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:6px 0">ຍັງບໍ່ມີຫ້ອງຮຽນ</div>'; return; }
+  ROOMS.forEach((name,idx)=>{
+    const used=Object.keys(schedule).filter(k=>effectiveRoom(k).toLowerCase()===String(name).toLowerCase()).length;
+    const div=document.createElement('div');
+    div.className='subject-chip';
+    div.innerHTML=`<div class="chip-dot" style="background:var(--accent2)"></div>
+      <div style="flex:1"><div class="chip-name">🚪 ${name}</div><div class="chip-room">${used} ຄາບ</div></div>
+      ${currentRole==='admin'?`<button class="chip-del" style="color:var(--accent)" onclick="editRoom(${idx})" title="ແກ້ໄຂ">✎</button>
+      <button class="chip-del" onclick="delRoom(${idx})" title="ລຶບ">✕</button>`:''}`;
+    el.appendChild(div);
+  });
+}
+function addRoom(){
+  if(currentRole!=='admin'){ alert('ຕ້ອງ login admin ກ່ອນ'); return; }
+  const inp=document.getElementById('roomName');
+  const name=inp.value.trim();
+  if(!name){ alert('ກະລຸນາໃສ່ຊື່ຫ້ອງ'); return; }
+  if(ROOMS.some(r=>r.toLowerCase()===name.toLowerCase())){ alert('ມີຫ້ອງນີ້ຢູ່ແລ້ວ'); return; }
+  ROOMS.push(name);
+  inp.value='';
+  renderRoomList(); saveData();
+}
+function editRoom(idx){
+  if(currentRole!=='admin') return;
+  const old=ROOMS[idx];
+  if(old===undefined) return;
+  const name=prompt('ປ່ຽນຊື່ຫ້ອງ:', old);
+  if(name===null) return;
+  const trimmed=name.trim();
+  if(!trimmed){ alert('ຊື່ຫ້ອງວ່າງບໍ່ໄດ້'); return; }
+  if(ROOMS.some((r,i)=>i!==idx && r.toLowerCase()===trimmed.toLowerCase())){ alert('ມີຫ້ອງນີ້ຢູ່ແລ້ວ'); return; }
+  ROOMS[idx]=trimmed;
+  // ອັບເດດການອ້າງອີງຊື່ຫ້ອງເກົ່າ → ໃໝ່ (override + ຫ້ອງຂອງວິຊາ)
+  Object.keys(roomSchedule).forEach(k=>{ if(roomSchedule[k]===old) roomSchedule[k]=trimmed; });
+  subjects.forEach(s=>{ if(s.room===old) s.room=trimmed; });
+  renderRoomList(); renderSubjectList(); renderCells(); saveData();
+}
+function delRoom(idx){
+  if(currentRole!=='admin') return;
+  const name=ROOMS[idx];
+  if(name===undefined) return;
+  if(!confirm(`ລຶບຫ້ອງ "${name}"?\n(ການມອບໝາຍຫ້ອງນີ້ໃນຕາຕະລາງຈະຖືກລ້າງ — ວິຊາຈະກັບໄປໃຊ້ຫ້ອງເລີ່ມຕົ້ນ)`)) return;
+  ROOMS.splice(idx,1);
+  Object.keys(roomSchedule).forEach(k=>{ if(roomSchedule[k]===name) delete roomSchedule[k]; });
+  renderRoomList(); renderCells(); saveData();
+}
+
+// ============================================================
 // CLASS (ຊັ້ນປີ/ສາຂາ) MANAGEMENT
 // ============================================================
 let editingClassId = null;
@@ -878,14 +987,17 @@ function addOrUpdateClass(){
     CLASSES[idx] = { ...CLASSES[idx], id, year, name:code, label, color:pickedClassColor.color, tc:pickedClassColor.tc };
     // Update schedule keys if id changed
     if(oldId!==id){
-      const newSchedule={};
+      const newSchedule={}; const newRoomSchedule={};
       Object.keys(schedule).forEach(key=>{
         const parts=key.split('-');
         const clsId=parts[1];
         if(clsId===oldId) parts[1]=id;
-        newSchedule[parts.join('-')]=schedule[key];
+        const nk=parts.join('-');
+        newSchedule[nk]=schedule[key];
+        if(roomSchedule[key]!==undefined) newRoomSchedule[nk]=roomSchedule[key];
       });
       schedule=newSchedule;
+      roomSchedule=newRoomSchedule;
     }
     cancelEditClass();
   } else {
@@ -932,7 +1044,7 @@ function delClass(id){
   // Remove schedule entries for this class
   Object.keys(schedule).forEach(key=>{
     const parts=key.split('-');
-    if(parts[1]===id) delete schedule[key];
+    if(parts[1]===id){ delete schedule[key]; delete roomSchedule[key]; }
   });
   if(editingClassId===id) cancelEditClass();
   renderClassList();
@@ -1148,12 +1260,15 @@ function renderMobileCards(){
       const assigned=subjects.find(s=>s.id===schedule[key]);
       const sub=(assigned && subjectVisible(assigned)) ? assigned : null; // ກັ່ນຕອງຕາມອາຈານ
       if(sub){
+        const rm=effectiveRoom(key);
+        const conf=rm && roomConflicts(key,rm).length>0;
         content.style.background=sub.color;
         content.style.color=isDark(sub.color)?'#fff':'#111';
         content.innerHTML=`<div class="dc-sub">
           ${sub.code?`<span class="dc-sub-meta">${sub.code}</span>`:''}
           <span class="dc-sub-name">${sub.name}</span>
-          ${[(sub.credit!=null&&sub.credit!=='')?'📘 '+sub.credit+' ໜ່ວຍກິດ':'', sub.room, sub.teacher?'👨‍🏫 '+sub.teacher:''].filter(Boolean).map(x=>`<span class="dc-sub-meta">${x}</span>`).join('')}
+          ${[(sub.credit!=null&&sub.credit!=='')?'📘 '+sub.credit+' ໜ່ວຍກິດ':'', rm?(conf?'⚠️ '+rm:'🚪 '+rm):'', sub.teacher?'👨‍🏫 '+sub.teacher:''].filter(Boolean).map(x=>`<span class="dc-sub-meta">${x}</span>`).join('')}
+          ${conf?'<span class="dc-sub-meta" style="background:#dc2626;color:#fff;font-weight:700">⚠️ ຫ້ອງທັບຊ້ອນ</span>':''}
         </div>`;
       } else {
         content.innerHTML='<span class="dc-empty">ບໍ່ມີຮຽນ</span>';
@@ -1196,11 +1311,14 @@ function renderCell(cell, key){
     d.className='slot-inner';
     d.style.background=sub.color;
     d.style.color=isDark(sub.color)?'#fff':'#111';
+    const rm=effectiveRoom(key);
+    const conf=rm && roomConflicts(key,rm).length>0;
     d.innerHTML=`${sub.code?`<span class="slot-code">${sub.code}</span>`:''}
       <span>${sub.name}</span>
       ${(sub.credit!=null&&sub.credit!=='')?`<span class="slot-room">📘 ${sub.credit} ໜ່ວຍກິດ</span>`:''}
-      ${sub.room?`<span class="slot-room">${sub.room}</span>`:''}
+      ${rm?`<span class="slot-room"${conf?' style="background:#dc2626;color:#fff;font-weight:700"':''}>${conf?'⚠️ ':'🚪 '}${rm}</span>`:''}
       ${sub.teacher?`<span class="slot-room">👨‍🏫 ${sub.teacher}</span>`:''}`;
+    if(conf) d.title='⚠️ ຫ້ອງ '+rm+' ທັບຊ້ອນກັບສາຂາອື່ນ ໃນວັນ/ຄາບດຽວກັນ';
     cell.appendChild(d);
   } else if(currentRole==='admin' && !assigned){
     const h=document.createElement('div');h.className='plus-hint';h.textContent='+';cell.appendChild(h);
@@ -1226,6 +1344,19 @@ function openModal(key, dayLabel, clsId, periodNum){
   activeCell=key;
   document.getElementById('modalTitle').textContent=`${clsId} · ${dayLabel}`;
   document.getElementById('modalSub').textContent=`ຄາບທີ ${periodNum}`;
+  // dropdown ເລືອກຫ້ອງສຳລັບຊ່ອງນີ້
+  const roomSel=document.getElementById('modalRoom');
+  if(roomSel){
+    const cur=(roomSchedule[key]||'').trim();
+    roomSel.innerHTML='';
+    const def=document.createElement('option');
+    def.value=''; def.textContent='— ໃຊ້ຫ້ອງເລີ່ມຕົ້ນຂອງວິຊາ —';
+    roomSel.appendChild(def);
+    ROOMS.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; roomSel.appendChild(o); });
+    // ຖ້າ override ປັດຈຸບັນບໍ່ຢູ່ໃນລາຍຊື່ ກໍເພີ່ມໃຫ້ເລືອກໄດ້
+    if(cur && !ROOMS.some(r=>r===cur)){ const o=document.createElement('option'); o.value=cur; o.textContent=cur+' (ນອກລາຍຊື່)'; roomSel.appendChild(o); }
+    roomSel.value=cur;
+  }
   const body=document.getElementById('modalBody');
   if(subjects.length===0){
     body.innerHTML='<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:12px">ຍັງບໍ່ທັນມີວິຊາ ກະລຸນາເພີ່ມວິຊາກ່ອນ</div>';
@@ -1248,43 +1379,36 @@ function openModal(key, dayLabel, clsId, periodNum){
 
 function selectSubject(id){
   if(!activeCell||currentRole!=='admin')return;
-  // ປ້ອງກັນຊ້ຳຫ້ອງ: ຫ້ອງດຽວກັນ ໃນ ວັນ+ຄາບ ດຽວກັນ (ຄົນລະວິຊາ)
+  const roomSel=document.getElementById('modalRoom');
+  const chosenRoom=roomSel ? roomSel.value.trim() : '';
+  // ຫ້ອງທີ່ໃຊ້ຈິງ: override ທີ່ເລືອກ ກ່ອນ, ບໍ່ດັ່ງນັ້ນເອົາຫ້ອງຂອງວິຊາ
   const sub=subjects.find(s=>s.id===id);
-  const room=((sub&&sub.room)||'').trim();
-  if(room){
-    const parts=activeCell.split('-');
-    const day=parts[0], pi=parts[parts.length-1];
-    const clash=[];
-    for(const k in schedule){
-      if(k===activeCell || schedule[k]===id) continue; // ຂ້າມຊ່ອງເກົ່າ ແລະ ວິຊາດຽວກັນ (ຮຽນລວມ)
-      const p=k.split('-');
-      if(p[0]!==day || p[p.length-1]!==pi) continue;
-      const other=subjects.find(s=>s.id===schedule[k]);
-      if(other && ((other.room||'').trim().toLowerCase()===room.toLowerCase())){
-        clash.push(p.slice(1,-1).join('-'));
-      }
-    }
-    if(clash.length){
-      const dl=(DAYS.find(d=>d.key===day)||{}).label||day;
-      const ok=confirm('⚠️ ຫ້ອງ "'+room+'" ຖືກໃຊ້ແລ້ວໃນ '+dl+' ຄາບ '+(parseInt(pi)+1)+'\nໂດຍ: '+clash.join(', ')+'\n\nຍັງຕ້ອງການກຳນົດໃຫ້ຫ້ອງນີ້ບໍ?');
-      if(!ok) return;
+  const effRoom=chosenRoom || (sub && sub.room ? String(sub.room).trim() : '');
+  // ກວດການທັບຊ້ອນຫ້ອງ — ວັນ+ຄາບດຽວກັນ ໃຊ້ຫ້ອງດຽວກັນ
+  if(effRoom){
+    const conflicts=roomConflicts(activeCell, effRoom);
+    if(conflicts.length){
+      const lines=conflicts.map(k=>'• '+cellDesc(k)).join('\n');
+      if(!confirm(`⚠️ ຫ້ອງ "${effRoom}" ຖືກໃຊ້ຢູ່ແລ້ວ ໃນວັນ/ຄາບດຽວກັນ:\n${lines}\n\nຍັງຕ້ອງການມອບໝາຍຫ້ອງນີ້ຢູ່ບໍ?`)) return;
     }
   }
   schedule[activeCell]=id;
-  renderCells(); saveData();
+  if(chosenRoom) roomSchedule[activeCell]=chosenRoom; else delete roomSchedule[activeCell];
+  renderCells(); renderRoomList(); saveData();
   document.getElementById('overlay').classList.remove('open');
 }
 function clearCell(){
   if(!activeCell||currentRole!=='admin')return;
   delete schedule[activeCell];
-  renderCells(); saveData();
+  delete roomSchedule[activeCell];
+  renderCells(); renderRoomList(); saveData();
   document.getElementById('overlay').classList.remove('open');
 }
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 function overlayClick(e){if(e.target===document.getElementById('overlay'))closeModal();}
 function clearAll(){
   if(currentRole!=='admin'||!confirm('ລ້າງຕາຕະລາງທັງໝົດ?'))return;
-  schedule={}; renderCells(); saveData();
+  schedule={}; roomSchedule={}; renderCells(); renderRoomList(); saveData();
 }
 
 // ============================================================
@@ -1294,6 +1418,8 @@ function saveLocal(){
   try{
     localStorage.setItem('snu_subjects', JSON.stringify(subjects));
     localStorage.setItem('snu_schedule', JSON.stringify(schedule));
+    localStorage.setItem('snu_roomsched',JSON.stringify(roomSchedule));
+    localStorage.setItem('snu_rooms',    JSON.stringify(ROOMS));
     localStorage.setItem('snu_classes',  JSON.stringify(CLASSES));
     localStorage.setItem('snu_meta',     JSON.stringify(schoolMeta));
   }catch(e){}
@@ -1312,6 +1438,8 @@ function applyTermData(d){
   d = d || {};
   subjects = Array.isArray(d.subjects) ? d.subjects.map(s=>({...s})) : [];
   schedule = (d.schedule&&typeof d.schedule==='object') ? {...d.schedule} : {};
+  roomSchedule = (d.roomSchedule&&typeof d.roomSchedule==='object') ? {...d.roomSchedule} : {};
+  ROOMS = Array.isArray(d.rooms) ? d.rooms.slice() : [];
   if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
   schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester:'' };
 }
@@ -1324,7 +1452,7 @@ function loadTermOffline(id){
   if(!schoolMeta.semester) schoolMeta.semester = t.label||'';
   saveLocal();
   buildColorGrid(); buildClassColorGrid(); rebuildTable();
-  renderSubjectList(); renderClassList(); renderMeta();
+  renderSubjectList(); renderRoomList(); renderClassList(); renderMeta();
 }
 
 // ໂຫລດເບື້ອງຕົ້ນ (offline first paint): ໃຊ້ cache ລ່າສຸດ ຫຼື ພາກຮຽນປັດຈຸບັນຈາກໄຟລ໌
@@ -1332,11 +1460,15 @@ function loadData(){
   try{
     const subs=localStorage.getItem('snu_subjects');
     const sch =localStorage.getItem('snu_schedule');
+    const rsc =localStorage.getItem('snu_roomsched');
+    const rms =localStorage.getItem('snu_rooms');
     const cls =localStorage.getItem('snu_classes');
     const mta =localStorage.getItem('snu_meta');
     if(subs||sch){
       if(subs) subjects=JSON.parse(subs);
       if(sch)  schedule=JSON.parse(sch);
+      if(rsc)  roomSchedule=JSON.parse(rsc);
+      if(rms)  ROOMS=JSON.parse(rms);
       if(cls)  CLASSES=JSON.parse(cls);
       if(mta)  schoolMeta=JSON.parse(mta);
     } else {
@@ -1352,7 +1484,7 @@ function loadData(){
 // ============================================================
 function exportJSON(){
   saveData();
-  const blob=new Blob([JSON.stringify({subjects,schedule,classes:CLASSES,meta:schoolMeta},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({subjects,schedule,roomSchedule,rooms:ROOMS,classes:CLASSES,meta:schoolMeta},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='timetable-snu.json';a.click();
 }
 function importClick(){document.getElementById('importFile').click();}
@@ -1364,9 +1496,11 @@ function importJSON(e){
       const data=JSON.parse(ev.target.result);
       if(data.subjects) subjects=data.subjects;
       if(data.schedule) schedule=data.schedule;
+      roomSchedule = (data.roomSchedule&&typeof data.roomSchedule==='object') ? data.roomSchedule : {};
+      ROOMS = Array.isArray(data.rooms) ? data.rooms.slice() : [];
       if(data.classes)  CLASSES=data.classes;
       if(data.meta)     schoolMeta=data.meta;
-      renderSubjectList(); renderClassList(); rebuildTable(); renderMeta(); saveData();
+      renderSubjectList(); renderRoomList(); renderClassList(); rebuildTable(); renderMeta(); saveData();
       alert('ນຳເຂົ້າສຳເລັດ!');
     }catch{alert('ໄຟລ໌ JSON ບໍ່ຖືກຕ້ອງ');}
   };

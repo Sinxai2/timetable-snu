@@ -10,10 +10,12 @@
 //   label      : ຊື່ສະແດງ (ເຊັ່ນ "ພາກຮຽນທີ II · 2025-2026")
 //   is_current : true ສຳລັບພາກຮຽນປັດຈຸບັນ (ມີໄດ້ອັນດຽວ)
 //   data       : { subjects, schedule, classes, meta }
-//        subjects : ລາຍການວິຊາ (id ເປັນຕົວເລກ, ບໍ່ຊ້ຳ)
-//        schedule : "ວັນ-ສາຂາ-ດັດສະນີຄາບ" => subjectId  (ຄາບ 1=0, 2=1, ...)
-//        classes  : null = ໃຊ້ສາຂາມາດຕະຖານໃນ code; ຫຼື array ສາຂາເອງ
-//        meta     : { semester: ຊື່ພາກຮຽນ }
+//        subjects     : ລາຍການວິຊາ (id ເປັນຕົວເລກ, ບໍ່ຊ້ຳ)
+//        schedule     : "ວັນ-ສາຂາ-ດັດສະນີຄາບ" => subjectId  (ຄາບ 1=0, 2=1, ...)
+//        roomSchedule : "ວັນ-ສາຂາ-ດັດສະນີຄາບ" => ຊື່ຫ້ອງ (override; ວ່າງ = ໃຊ້ຫ້ອງຂອງວິຊາ)
+//        rooms        : array ຊື່ຫ້ອງຮຽນ (ແກ້ໄຂໄດ້; ໃຊ້ກວດການທັບຊ້ອນ)
+//        classes      : null = ໃຊ້ສາຂາມາດຕະຖານໃນ code; ຫຼື array ສາຂາເອງ
+//        meta         : { semester: ຊື່ພາກຮຽນ }
 // ============================================================
 window.SNU_DATA = {
   version: 3,
@@ -30,6 +32,8 @@ window.SNU_DATA = {
         schedule: {
           'mon-1AI-1': 1000001   // ວັນຈັນ · 1AI · ຄາບ 2 · ພາສາອັງກິດ
         },
+        roomSchedule: {},          // override ຫ້ອງຕໍ່ຊ່ອງ (ວ່າງ = ໃຊ້ຫ້ອງຂອງວິຊາ)
+        rooms: ['R203'],           // ລາຍຊື່ຫ້ອງຮຽນ (ແກ້ໄຂໄດ້ໃນ admin)
         classes: null,
         meta: { semester: 'ພາກຮຽນທີ II · 2025-2026' }
       }
@@ -42,6 +46,8 @@ window.SNU_DATA = {
       data: {
         subjects: [],
         schedule: {},
+        roomSchedule: {},
+        rooms: [],
         classes: null,
         meta: { semester: 'ພາກຮຽນທີ I · 2025-2026' }
       }
