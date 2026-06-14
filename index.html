@@ -119,7 +119,10 @@
             <label>ສີ</label>
             <div class="color-grid" id="colorGrid"></div>
           </div>
-          <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="addSubject()">+ ເພີ່ມວິຊາ</button>
+          <button class="btn btn-primary" id="subFormBtn" style="width:100%;margin-top:4px" onclick="addSubject()">+ ເພີ່ມວິຊາ</button>
+          <div id="subFormCancelWrap" style="display:none;margin-top:6px">
+            <button class="btn btn-ghost" style="width:100%" onclick="cancelEditSubject()">ຍົກເລີກການແກ້ໄຂ</button>
+          </div>
         </div>
         <div>
           <div class="section-lbl">📋 ລາຍການວິຊາ</div>
@@ -693,25 +696,53 @@ function buildClassColorGrid(){
 // ============================================================
 // SUBJECTS
 // ============================================================
+let editingSubjectId = null;
 function addSubject(){
   const name=document.getElementById('subName').value.trim();
   if(!name){alert('ກະລຸນາໃສ່ຊື່ວິຊາ');return;}
   const creditRaw=document.getElementById('subCredit').value.trim();
-  subjects.push({
-    id:Date.now(),
+  const fields={
     code:document.getElementById('subCode').value.trim(),
     name,
     room:document.getElementById('subRoom').value.trim(),
     teacher:document.getElementById('subTeacher').value.trim(),
     credit:(creditRaw===''?null:Number(creditRaw)),
     color:pickedColor
-  });
+  };
+  if(editingSubjectId!=null){
+    // ແກ້ໄຂວິຊາທີ່ມີຢູ່ (ຮັກສາ id ເດີມ ໃຫ້ຕາຕະລາງຍັງອ້າງເຖິງໄດ້)
+    const s=subjects.find(x=>x.id===editingSubjectId);
+    if(s) Object.assign(s, fields);
+    cancelEditSubject();
+  } else {
+    subjects.push({ id:Date.now(), ...fields });
+  }
   document.getElementById('subCode').value='';
   document.getElementById('subName').value='';
   document.getElementById('subRoom').value='';
   document.getElementById('subTeacher').value='';
   document.getElementById('subCredit').value='';
   renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
+}
+function editSubject(id){
+  const s=subjects.find(x=>x.id===id); if(!s) return;
+  editingSubjectId=id;
+  document.getElementById('subCode').value=s.code||'';
+  document.getElementById('subName').value=s.name||'';
+  document.getElementById('subRoom').value=s.room||'';
+  document.getElementById('subTeacher').value=s.teacher||'';
+  document.getElementById('subCredit').value=(s.credit!=null?s.credit:'');
+  pickedColor=s.color; buildColorGrid();
+  document.getElementById('subFormBtn').textContent='✓ ບັນທຶກການແກ້ໄຂ';
+  document.getElementById('subFormCancelWrap').style.display='';
+  document.querySelector('#adminSide')&&document.getElementById('subName').scrollIntoView({block:'center',behavior:'smooth'});
+  document.getElementById('subName').focus();
+}
+function cancelEditSubject(){
+  editingSubjectId=null;
+  document.getElementById('subFormBtn').textContent='+ ເພີ່ມວິຊາ';
+  document.getElementById('subFormCancelWrap').style.display='none';
+  ['subCode','subName','subRoom','subTeacher','subCredit'].forEach(i=>document.getElementById(i).value='');
 }
 function delSubject(id){
   if(!confirm('ລຶບວິຊານີ້?'))return;
@@ -730,7 +761,7 @@ function renderSubjectList(){
     const metaBits=[s.room, s.teacher, (s.credit!=null&&s.credit!=='')?s.credit+' ໜ່ວຍກິດ':''].filter(Boolean);
     div.innerHTML=`<div class="chip-dot" style="background:${s.color}"></div>
       <div style="flex:1"><div class="chip-name">${s.code?s.code+' ':''} ${s.name}</div>${metaBits.length?`<div class="chip-room">${metaBits.join(' · ')}</div>`:''}</div>
-      ${currentRole==='admin'?`<button class="chip-del" onclick="delSubject(${s.id})">✕</button>`:''}`;
+      ${currentRole==='admin'?`<button class="chip-del" title="ແກ້ໄຂ" style="color:var(--accent)" onclick="editSubject(${s.id})">✎</button><button class="chip-del" title="ລຶບ" onclick="delSubject(${s.id})">✕</button>`:''}`;
     el.appendChild(div);
   });
 }
@@ -1205,6 +1236,28 @@ function openModal(key, dayLabel, clsId, periodNum){
 
 function selectSubject(id){
   if(!activeCell||currentRole!=='admin')return;
+  // ປ້ອງກັນຊ້ຳຫ້ອງ: ຫ້ອງດຽວກັນ ໃນ ວັນ+ຄາບ ດຽວກັນ (ຄົນລະວິຊາ)
+  const sub=subjects.find(s=>s.id===id);
+  const room=((sub&&sub.room)||'').trim();
+  if(room){
+    const parts=activeCell.split('-');
+    const day=parts[0], pi=parts[parts.length-1];
+    const clash=[];
+    for(const k in schedule){
+      if(k===activeCell || schedule[k]===id) continue; // ຂ້າມຊ່ອງເກົ່າ ແລະ ວິຊາດຽວກັນ (ຮຽນລວມ)
+      const p=k.split('-');
+      if(p[0]!==day || p[p.length-1]!==pi) continue;
+      const other=subjects.find(s=>s.id===schedule[k]);
+      if(other && ((other.room||'').trim().toLowerCase()===room.toLowerCase())){
+        clash.push(p.slice(1,-1).join('-'));
+      }
+    }
+    if(clash.length){
+      const dl=(DAYS.find(d=>d.key===day)||{}).label||day;
+      const ok=confirm('⚠️ ຫ້ອງ "'+room+'" ຖືກໃຊ້ແລ້ວໃນ '+dl+' ຄາບ '+(parseInt(pi)+1)+'\nໂດຍ: '+clash.join(', ')+'\n\nຍັງຕ້ອງການກຳນົດໃຫ້ຫ້ອງນີ້ບໍ?');
+      if(!ok) return;
+    }
+  }
   schedule[activeCell]=id;
   renderCells(); saveData();
   document.getElementById('overlay').classList.remove('open');
