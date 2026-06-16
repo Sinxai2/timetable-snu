@@ -127,6 +127,7 @@
         </div>
         <div>
           <div class="section-lbl">📋 ລາຍການວິຊາ</div>
+          <input id="subjectSearch" oninput="renderSubjectList()" placeholder="🔍 ຄົ້ນຫາ ວິຊາ / ອາຈານ / ລະຫັດ" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;outline:none;margin-bottom:8px">
           <div class="subject-list" id="subjectList"></div>
         </div>
         <hr>
@@ -782,7 +783,13 @@ function renderSubjectList(){
   if(!el)return;
   el.innerHTML='';
   if(subjects.length===0){el.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:6px 0">ຍັງບໍ່ທັນມີວິຊາ</div>';return;}
-  subjects.forEach(s=>{
+  // ກອງຕາມ ຊື່ວິຊາ / ອາຈານ / ລະຫັດ / ຫ້ອງ
+  const q=((document.getElementById('subjectSearch')||{}).value||'').trim().toLowerCase();
+  const list = q
+    ? subjects.filter(s=>[s.code,s.name,s.teacher,s.room].filter(Boolean).join(' ').toLowerCase().includes(q))
+    : subjects;
+  if(list.length===0){el.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:6px 0">ບໍ່ພົບ "'+q+'"</div>';return;}
+  list.forEach(s=>{
     const div=document.createElement('div');
     div.className='subject-chip';
     const metaBits=[s.room, s.teacher, (s.credit!=null&&s.credit!=='')?s.credit+' ໜ່ວຍກິດ':''].filter(Boolean);
