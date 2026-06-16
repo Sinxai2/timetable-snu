@@ -488,7 +488,13 @@ async function loadTerm(id){
     roomSchedule = (d.roomSchedule&&typeof d.roomSchedule==='object') ? {...d.roomSchedule} : {};
     ROOMS = Array.isArray(d.rooms) ? d.rooms.slice() : [];
     TEACHERS = Array.isArray(d.teachers) ? d.teachers.slice() : [];
-    if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
+    if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c})); // fallback/offline mirror
+    // class_tb = ແຫຼ່ງຫຼັກ: ຖ້າມີຂໍ້ມູນ → ໃຊ້; ຖ້າວ່າງ & admin → seed ຈาก CLASSES (migration #1)
+    const dbClasses = await loadClassesFromDB(id);
+    if(dbClasses){
+      if(dbClasses.length) CLASSES = dbClasses;
+      else if(currentRole==='admin' && CLASSES.length) await syncClassesToDB(id, CLASSES);
+    }
     schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester: row.label||'' };
     if(!schoolMeta.semester) schoolMeta.semester = row.label||'';
     syncTeachers();
@@ -507,6 +513,37 @@ async function loadTerm(id){
 async function onTermChange(){
   const sel=document.getElementById('termSelect');
   if(sel && sel.value) await loadTerm(sel.value);
+}
+
+// ============================================================
+// CLASS_TB (Supabase) — ຊັ້ນປີ/ສາຂາ ເກັບເປັນຕາຕະລາງແຍກ
+// ============================================================
+// ອ່ານ classes ຂອງ 1 ພາກຮຽນ ຈาก class_tb → array ຮูปแบบ CLASSES (null = error/ออฟไลน์)
+async function loadClassesFromDB(termId){
+  try{
+    const { data, error } = await sb.from('class_tb')
+      .select('class_id,year,name,label,color,tc,sort_order')
+      .eq('term_id', termId)
+      .order('sort_order', { ascending:true });
+    if(error) throw error;
+    return (data||[]).map(r=>({ id:r.class_id, year:r.year, name:r.name, label:r.label||'', color:r.color||'', tc:r.tc||'' }));
+  }catch(e){ return null; }
+}
+// ຊິ້ງ CLASSES ປັດຈຸບັນ → class_tb (ລຶບເກົ່າຂອງພາກຮຽນ ແລ້ວໃສ່ໃໝ່). ງຽບ error (ออฟไลน์/ບໍ່ແມ່ນ admin)
+async function syncClassesToDB(termId, list){
+  if(!termId || currentRole!=='admin') return;
+  try{
+    const { error:delErr } = await sb.from('class_tb').delete().eq('term_id', termId);
+    if(delErr) throw delErr;
+    if(list && list.length){
+      const rows = list.map((c,i)=>({
+        term_id: termId, class_id: c.id, year: c.year, name: c.name,
+        label: c.label||'', color: c.color||'', tc: c.tc||'', sort_order: i
+      }));
+      const { error:insErr } = await sb.from('class_tb').insert(rows);
+      if(insErr) throw insErr;
+    }
+  }catch(e){ /* ເກັບ JSON mirror ໃນ terms.data ໄວ້ແທນ */ }
 }
 
 // admin ສ້າງພາກຮຽນໃໝ່
@@ -1168,6 +1205,7 @@ function addOrUpdateClass(){
   renderClassList();
   rebuildTable();
   saveData();
+  syncClassesToDB(currentTermId, CLASSES);
 }
 
 function editClass(id){
@@ -1205,6 +1243,7 @@ function delClass(id){
   renderClassList();
   rebuildTable();
   saveData();
+  syncClassesToDB(currentTermId, CLASSES);
 }
 
 function renderClassList(){
