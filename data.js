@@ -14,6 +14,7 @@
 //        schedule     : "ວັນ-ສາຂາ-ດັດສະນີຄາບ" => subjectId  (ຄາບ 1=0, 2=1, ...)
 //        roomSchedule : "ວັນ-ສາຂາ-ດັດສະນີຄາບ" => ຊື່ຫ້ອງ (override; ວ່າງ = ໃຊ້ຫ້ອງຂອງວິຊາ)
 //        rooms        : array ຊື່ຫ້ອງຮຽນ (ແກ້ໄຂໄດ້; ໃຊ້ກວດການທັບຊ້ອນ)
+//        teachers     : array ຊື່ອາຈານ (ແກ້ໄຂໄດ້; ອາຈານ 1 ຄົນ ສອນໄດ້ຫຼາຍວິຊາ)
 //        classes      : null = ໃຊ້ສາຂາມາດຕະຖານໃນ code; ຫຼື array ສາຂາເອງ
 //        meta         : { semester: ຊື່ພາກຮຽນ }
 // ============================================================
@@ -34,6 +35,7 @@ window.SNU_DATA = {
         },
         roomSchedule: {},          // override ຫ້ອງຕໍ່ຊ່ອງ (ວ່າງ = ໃຊ້ຫ້ອງຂອງວິຊາ)
         rooms: ['R203'],           // ລາຍຊື່ຫ້ອງຮຽນ (ແກ້ໄຂໄດ້ໃນ admin)
+        teachers: ['ສຸເທວາ'],      // ລາຍຊື່ອາຈານ (ແກ້ໄຂໄດ້ໃນ admin; 1 ຄົນ→ຫຼາຍວິຊາ)
         classes: null,
         meta: { semester: 'ພາກຮຽນທີ II · 2025-2026' }
       }
@@ -48,6 +50,7 @@ window.SNU_DATA = {
         schedule: {},
         roomSchedule: {},
         rooms: [],
+        teachers: [],
         classes: null,
         meta: { semester: 'ພາກຮຽນທີ I · 2025-2026' }
       }

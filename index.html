@@ -110,7 +110,8 @@
           </div>
           <div class="field-row">
             <label>ອາຈານຜູ້ສອນ</label>
-            <input type="text" id="subTeacher" placeholder="ຊື່ອາຈານ">
+            <input type="text" id="subTeacher" placeholder="ຊື່ອາຈານ" list="teacherOptions">
+            <datalist id="teacherOptions"></datalist>
           </div>
           <div class="field-row">
             <label>ໜ່ວຍກິດ</label>
@@ -142,6 +143,19 @@
             <button class="btn btn-primary" style="white-space:nowrap" onclick="addRoom()">+ ເພີ່ມ</button>
           </div>
           <div class="subject-list" id="roomList" style="margin-top:10px"></div>
+        </div>
+        <hr>
+        <div>
+          <div class="section-lbl">👨‍🏫 ຈັດການອາຈານ</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">ເພີ່ມອາຈານ ແລ້ວກົດ 📋 ເພື່ອເລືອກວິຊາທີ່ອາຈານສອນ (1 ຄົນ ສອນໄດ້ຫຼາຍວິຊາ)</div>
+          <div class="field-row" style="display:flex;gap:6px;align-items:flex-end">
+            <div style="flex:1">
+              <label>ຊື່ອາຈານ</label>
+              <input type="text" id="teacherName" placeholder="ຊື່ອາຈານ" onkeydown="if(event.key==='Enter')addTeacher()">
+            </div>
+            <button class="btn btn-primary" style="white-space:nowrap" onclick="addTeacher()">+ ເພີ່ມ</button>
+          </div>
+          <div class="subject-list" id="teacherMgmtList" style="margin-top:10px"></div>
         </div>
         <hr>
         <div>
@@ -275,6 +289,19 @@
   </div>
 </div>
 
+<!-- Modal: ເລືອກວິຊາທີ່ອາຈານສອນ -->
+<div class="overlay" id="teacherOverlay" onclick="teacherOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-title">👨‍🏫 <span id="tmName"></span></div>
+    <div class="modal-sub">ກົດເພື່ອເລືອກ/ຍົກເລີກ ວິຊາທີ່ອາຈານນີ້ສອນ</div>
+    <input id="tmSearch" oninput="renderTeacherSubjects()" placeholder="🔍 ຄົ້ນຫາວິຊາ / ລະຫັດ" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;outline:none;margin:6px 0 10px">
+    <div class="sub-opts" id="tmBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" style="flex:1" onclick="closeTeacherModal()">ສຳເລັດ</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // CONSTANTS
@@ -360,9 +387,11 @@ let subjects    = [];
 let schedule    = {}; // key: "dayKey-classId-periodIndex" => subjectId
 let roomSchedule= {}; // key ດຽວກັນ => ຊື່ຫ້ອງ (override; ວ່າງ = ໃຊ້ຫ້ອງເລີ່ມຕົ້ນຂອງວິຊາ)
 let ROOMS       = []; // ລາຍຊື່ຫ້ອງຮຽນ (ແກ້ໄຂໄດ້ໂດຍ admin) — array ຂອງ string
+let TEACHERS    = []; // ລາຍຊື່ອາຈານ (ແກ້ໄຂໄດ້ໂດຍ admin) — array ຂອງ string
 let schoolMeta  = { semester: 'ພາກຮຽນທີ II · 2025-2026' }; // ສົກຮຽນ/ພາກຮຽນ (ແກ້ໄຂໄດ້)
 let pickedColor = COLORS[0];
 let activeCell  = null;
+let activeTeacher = null; // ອາຈານທີ່ກຳລັງເລືອກວິຊາໃຫ້ (ໃນ teacher modal)
 
 // ສະແດງສົກຮຽນ/ພາກຮຽນ ໃນ badge + header + ຊ່ອງ input ຂອງ admin
 function renderMeta(){
@@ -458,12 +487,14 @@ async function loadTerm(id){
     schedule = (d.schedule&&typeof d.schedule==='object') ? {...d.schedule} : {};
     roomSchedule = (d.roomSchedule&&typeof d.roomSchedule==='object') ? {...d.roomSchedule} : {};
     ROOMS = Array.isArray(d.rooms) ? d.rooms.slice() : [];
+    TEACHERS = Array.isArray(d.teachers) ? d.teachers.slice() : [];
     if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
     schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester: row.label||'' };
     if(!schoolMeta.semester) schoolMeta.semester = row.label||'';
+    syncTeachers();
     saveLocal();
     buildColorGrid(); buildClassColorGrid(); rebuildTable();
-    renderSubjectList(); renderRoomList(); renderClassList(); renderMeta(); refreshTeacherUI();
+    renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); renderMeta(); refreshTeacherUI();
     setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
     // ອອບລາຍ → ໃຊ້ໄຟລ໌ສຳຮອງ data.js
@@ -485,8 +516,8 @@ async function createTerm(){
   if(!label || !label.trim()) return;
   const copy=confirm('ສຳເນົາ "ສາຂາ + ວິຊາ" ຈາກພາກຮຽນປັດຈຸບັນບໍ?\n(ຕາຕະລາງຈະວ່າງ ໃຫ້ຈັດໃໝ່)\n\nOK = ສຳເນົາ · Cancel = ເລີ່ມວ່າງລ້າ');
   const newData = copy
-    ? { subjects:subjects.map(s=>({...s})), schedule:{}, roomSchedule:{}, rooms:ROOMS.slice(), classes:CLASSES.map(c=>({...c})), meta:{semester:label.trim()} }
-    : { subjects:[], schedule:{}, roomSchedule:{}, rooms:[], classes:null, meta:{semester:label.trim()} };
+    ? { subjects:subjects.map(s=>({...s})), schedule:{}, roomSchedule:{}, rooms:ROOMS.slice(), teachers:TEACHERS.slice(), classes:CLASSES.map(c=>({...c})), meta:{semester:label.trim()} }
+    : { subjects:[], schedule:{}, roomSchedule:{}, rooms:[], teachers:[], classes:null, meta:{semester:label.trim()} };
   const id='t-'+Date.now();
   try{
     setSyncStatus('☁️ ກຳລັງສ້າງ…','var(--text-muted)');
@@ -544,7 +575,7 @@ async function pushToServer(){
     const label = (schoolMeta&&schoolMeta.semester)||'';
     const { error } = await sb.from('terms').update({
       label,
-      data:{ subjects, schedule, roomSchedule, rooms:ROOMS, classes:CLASSES, meta:schoolMeta },
+      data:{ subjects, schedule, roomSchedule, rooms:ROOMS, teachers:TEACHERS, classes:CLASSES, meta:schoolMeta },
       version:newVersion,
       updated_at:new Date().toISOString()
     }).eq('id',currentTermId);
@@ -644,6 +675,7 @@ function startApp(role, chipLabel){
   rebuildTable();
   renderSubjectList();
   renderRoomList();
+  renderTeacherMgmt();
   renderClassList();
   renderMeta();
   refreshTeacherUI();
@@ -750,7 +782,8 @@ function addSubject(){
   document.getElementById('subRoom').value='';
   document.getElementById('subTeacher').value='';
   document.getElementById('subCredit').value='';
-  renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
+  syncTeachers();
+  renderSubjectList(); renderTeacherMgmt(); renderCells(); refreshTeacherUI(); saveData();
 }
 function editSubject(id){
   const s=subjects.find(x=>x.id===id); if(!s) return;
@@ -776,7 +809,7 @@ function delSubject(id){
   if(!confirm('ລຶບວິຊານີ້?'))return;
   subjects=subjects.filter(s=>s.id!==id);
   Object.keys(schedule).forEach(k=>{if(schedule[k]===id){delete schedule[k]; delete roomSchedule[k];}});
-  renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
+  renderSubjectList(); renderTeacherMgmt(); renderCells(); refreshTeacherUI(); saveData();
 }
 function renderSubjectList(){
   const el=document.getElementById('subjectList');
@@ -967,6 +1000,120 @@ function delRoom(idx){
   ROOMS.splice(idx,1);
   Object.keys(roomSchedule).forEach(k=>{ if(roomSchedule[k]===name) delete roomSchedule[k]; });
   renderRoomList(); renderCells(); saveData();
+}
+
+// ============================================================
+// TEACHER (ອາຈານ) MANAGEMENT — ອາຈານ 1 ຄົນ ສອນໄດ້ຫຼາຍວິຊາ
+// ============================================================
+// ດຶງຊື່ອາຈານທີ່ມີໃນວິຊາ ມາເພີ່ມໃສ່ TEACHERS (ໃຫ້ຂໍ້ມູນເກົ່າຍັງສະແດງ)
+function syncTeachers(){
+  if(!Array.isArray(TEACHERS)) TEACHERS=[];
+  subjects.forEach(s=>{
+    const t=(s.teacher||'').trim();
+    if(t && !TEACHERS.some(x=>x.toLowerCase()===t.toLowerCase())) TEACHERS.push(t);
+  });
+}
+// ລາຍຊື່ອາຈານທີ່ຈັດການໄດ້ (TEACHERS) ລຽງຕາມຕົວອັກສອນ
+function managedTeachers(){
+  return [...TEACHERS].sort((a,b)=>a.localeCompare(b));
+}
+// ສ້າງ datalist ໃຫ້ຊ່ອງ "ອາຈານຜູ້ສອນ" ໃນຟອມວິຊາ + render ລາຍການຈັດການອາຈານ
+function renderTeacherMgmt(){
+  const dl=document.getElementById('teacherOptions');
+  if(dl) dl.innerHTML=managedTeachers().map(t=>`<option value="${t}"></option>`).join('');
+  const el=document.getElementById('teacherMgmtList');
+  if(!el) return;
+  el.innerHTML='';
+  const names=managedTeachers();
+  if(names.length===0){ el.innerHTML='<div style="font-size:11px;color:var(--text-muted);padding:6px 0">ຍັງບໍ່ມີອາຈານ</div>'; return; }
+  names.forEach(name=>{
+    const subs=subjects.filter(s=>(s.teacher||'').trim()===name);
+    const div=document.createElement('div');
+    div.className='subject-chip';
+    const subNames=subs.map(s=>s.code?s.code:s.name).join(', ');
+    div.innerHTML=`<div class="chip-dot" style="background:var(--accent)"></div>
+      <div style="flex:1">
+        <div class="chip-name">👨‍🏫 ${name}</div>
+        <div class="chip-room">${subs.length} ວິຊາ${subNames?' · '+subNames:''}</div>
+      </div>
+      ${currentRole==='admin'?`<button class="chip-del" style="color:var(--accent2)" onclick="openTeacherModal('${name.replace(/'/g,"\\'")}')" title="ເລືອກວິຊາທີ່ສອນ">📋</button>
+      <button class="chip-del" style="color:var(--accent)" onclick="editTeacher('${name.replace(/'/g,"\\'")}')" title="ປ່ຽນຊື່">✎</button>
+      <button class="chip-del" onclick="delTeacher('${name.replace(/'/g,"\\'")}')" title="ລຶບ">✕</button>`:''}`;
+    el.appendChild(div);
+  });
+}
+function addTeacher(){
+  if(currentRole!=='admin'){ alert('ຕ້ອງ login admin ກ່ອນ'); return; }
+  const inp=document.getElementById('teacherName');
+  const name=inp.value.trim();
+  if(!name){ alert('ກະລຸນາໃສ່ຊື່ອາຈານ'); return; }
+  if(TEACHERS.some(t=>t.toLowerCase()===name.toLowerCase())){ alert('ມີອາຈານນີ້ຢູ່ແລ້ວ'); return; }
+  TEACHERS.push(name);
+  inp.value='';
+  renderTeacherMgmt(); refreshTeacherUI(); saveData();
+}
+function editTeacher(oldName){
+  if(currentRole!=='admin') return;
+  const idx=TEACHERS.findIndex(t=>t===oldName);
+  if(idx===-1) return;
+  const name=prompt('ປ່ຽນຊື່ອາຈານ:', oldName);
+  if(name===null) return;
+  const trimmed=name.trim();
+  if(!trimmed){ alert('ຊື່ອາຈານວ່າງບໍ່ໄດ້'); return; }
+  if(TEACHERS.some((t,i)=>i!==idx && t.toLowerCase()===trimmed.toLowerCase())){ alert('ມີອາຈານນີ້ຢູ່ແລ້ວ'); return; }
+  TEACHERS[idx]=trimmed;
+  subjects.forEach(s=>{ if((s.teacher||'').trim()===oldName) s.teacher=trimmed; });
+  renderTeacherMgmt(); renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
+}
+function delTeacher(name){
+  if(currentRole!=='admin') return;
+  const cnt=subjects.filter(s=>(s.teacher||'').trim()===name).length;
+  if(!confirm(`ລຶບອາຈານ "${name}"?`+(cnt?`\n(${cnt} ວິຊາທີ່ມອບໝາຍໃຫ້ອາຈານນີ້ ຈະຖືກລ້າງຊື່ອາຈານ)`:''))) return;
+  TEACHERS=TEACHERS.filter(t=>t!==name);
+  subjects.forEach(s=>{ if((s.teacher||'').trim()===name) s.teacher=''; });
+  renderTeacherMgmt(); renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
+}
+
+// ---- Modal: ເລືອກວິຊາທີ່ອາຈານສອນ ----
+function openTeacherModal(name){
+  if(currentRole!=='admin') return;
+  activeTeacher=name;
+  document.getElementById('tmName').textContent=name;
+  const ss=document.getElementById('tmSearch'); if(ss) ss.value='';
+  renderTeacherSubjects();
+  document.getElementById('teacherOverlay').classList.add('open');
+}
+function closeTeacherModal(){ document.getElementById('teacherOverlay').classList.remove('open'); }
+function teacherOverlayClick(e){ if(e.target===document.getElementById('teacherOverlay')) closeTeacherModal(); }
+function renderTeacherSubjects(){
+  if(!activeTeacher) return;
+  const body=document.getElementById('tmBody');
+  if(!body) return;
+  if(subjects.length===0){ body.innerHTML='<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:12px">ຍັງບໍ່ທັນມີວິຊາ</div>'; return; }
+  const q=((document.getElementById('tmSearch')||{}).value||'').trim().toLowerCase();
+  const list=q ? subjects.filter(s=>[s.code,s.name,s.teacher].filter(Boolean).join(' ').toLowerCase().includes(q)) : subjects;
+  body.innerHTML='';
+  if(list.length===0){ body.innerHTML='<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:12px">ບໍ່ພົບວິຊາ "'+q+'"</div>'; return; }
+  list.forEach(s=>{
+    const mine=(s.teacher||'').trim()===activeTeacher;
+    const otherT=(s.teacher||'').trim();
+    const taken=otherT && !mine; // ມີອາຈານອື່ນສອນຢູ່ແລ້ວ
+    const btn=document.createElement('button');
+    btn.className='sub-opt-btn'+(mine?' sel':'');
+    if(mine){ btn.style.background=s.color+'33'; btn.style.borderColor=s.color; }
+    btn.innerHTML=`<div style="width:18px;text-align:center;flex-shrink:0">${mine?'✅':'⬜'}</div>
+      <div style="flex:1"><div style="font-weight:700">${s.code?s.code+' ':''} ${s.name}</div>${taken?`<div style="font-size:9px;opacity:.7">👨‍🏫 ${otherT} (ກົດເພື່ອຍ້າຍມາ ${activeTeacher})</div>`:''}</div>`;
+    btn.onclick=()=>toggleTeacherSubject(s.id);
+    body.appendChild(btn);
+  });
+}
+function toggleTeacherSubject(id){
+  if(!activeTeacher||currentRole!=='admin') return;
+  const s=subjects.find(x=>x.id===id);
+  if(!s) return;
+  const mine=(s.teacher||'').trim()===activeTeacher;
+  s.teacher = mine ? '' : activeTeacher;  // ຕິກ=ມອບໝາຍ, ຍົກເລີກ=ລ້າງ
+  renderTeacherSubjects(); renderSubjectList(); renderTeacherMgmt(); renderCells(); refreshTeacherUI(); saveData();
 }
 
 // ============================================================
@@ -1447,6 +1594,7 @@ function saveLocal(){
     localStorage.setItem('snu_schedule', JSON.stringify(schedule));
     localStorage.setItem('snu_roomsched',JSON.stringify(roomSchedule));
     localStorage.setItem('snu_rooms',    JSON.stringify(ROOMS));
+    localStorage.setItem('snu_teachers', JSON.stringify(TEACHERS));
     localStorage.setItem('snu_classes',  JSON.stringify(CLASSES));
     localStorage.setItem('snu_meta',     JSON.stringify(schoolMeta));
   }catch(e){}
@@ -1467,8 +1615,10 @@ function applyTermData(d){
   schedule = (d.schedule&&typeof d.schedule==='object') ? {...d.schedule} : {};
   roomSchedule = (d.roomSchedule&&typeof d.roomSchedule==='object') ? {...d.roomSchedule} : {};
   ROOMS = Array.isArray(d.rooms) ? d.rooms.slice() : [];
+  TEACHERS = Array.isArray(d.teachers) ? d.teachers.slice() : [];
   if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
   schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester:'' };
+  syncTeachers();
 }
 // ໂຫລດ 1 ພາກຮຽນຈາກໄຟລ໌ສຳຮອງ (ໃຊ້ຕອນ Supabase ອອບລາຍ)
 function loadTermOffline(id){
@@ -1479,7 +1629,7 @@ function loadTermOffline(id){
   if(!schoolMeta.semester) schoolMeta.semester = t.label||'';
   saveLocal();
   buildColorGrid(); buildClassColorGrid(); rebuildTable();
-  renderSubjectList(); renderRoomList(); renderClassList(); renderMeta();
+  renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); renderMeta();
 }
 
 // ໂຫລດເບື້ອງຕົ້ນ (offline first paint): ໃຊ້ cache ລ່າສຸດ ຫຼື ພາກຮຽນປັດຈຸບັນຈາກໄຟລ໌
@@ -1489,6 +1639,7 @@ function loadData(){
     const sch =localStorage.getItem('snu_schedule');
     const rsc =localStorage.getItem('snu_roomsched');
     const rms =localStorage.getItem('snu_rooms');
+    const tch =localStorage.getItem('snu_teachers');
     const cls =localStorage.getItem('snu_classes');
     const mta =localStorage.getItem('snu_meta');
     if(subs||sch){
@@ -1496,8 +1647,10 @@ function loadData(){
       if(sch)  schedule=JSON.parse(sch);
       if(rsc)  roomSchedule=JSON.parse(rsc);
       if(rms)  ROOMS=JSON.parse(rms);
+      if(tch)  TEACHERS=JSON.parse(tch);
       if(cls)  CLASSES=JSON.parse(cls);
       if(mta)  schoolMeta=JSON.parse(mta);
+      syncTeachers();
     } else {
       const sts=seedTerms();
       const cur=sts.find(t=>t.is_current)||sts[0];
@@ -1511,7 +1664,7 @@ function loadData(){
 // ============================================================
 function exportJSON(){
   saveData();
-  const blob=new Blob([JSON.stringify({subjects,schedule,roomSchedule,rooms:ROOMS,classes:CLASSES,meta:schoolMeta},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({subjects,schedule,roomSchedule,rooms:ROOMS,teachers:TEACHERS,classes:CLASSES,meta:schoolMeta},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='timetable-snu.json';a.click();
 }
 function importClick(){document.getElementById('importFile').click();}
@@ -1525,9 +1678,11 @@ function importJSON(e){
       if(data.schedule) schedule=data.schedule;
       roomSchedule = (data.roomSchedule&&typeof data.roomSchedule==='object') ? data.roomSchedule : {};
       ROOMS = Array.isArray(data.rooms) ? data.rooms.slice() : [];
+      TEACHERS = Array.isArray(data.teachers) ? data.teachers.slice() : [];
       if(data.classes)  CLASSES=data.classes;
       if(data.meta)     schoolMeta=data.meta;
-      renderSubjectList(); renderRoomList(); renderClassList(); rebuildTable(); renderMeta(); saveData();
+      syncTeachers();
+      renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); rebuildTable(); renderMeta(); saveData();
       alert('ນຳເຂົ້າສຳເລັດ!');
     }catch{alert('ໄຟລ໌ JSON ບໍ່ຖືກຕ້ອງ');}
   };
