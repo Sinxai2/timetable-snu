@@ -94,6 +94,16 @@
         </div>
         <hr>
         <div>
+          <div class="section-lbl">🕐 ເວລາຄາບຮຽນ</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;line-height:1.6">
+            ແກ້ໄຂເວລາ ເລີ່ມ–ເລີກ ຂອງແຕ່ລະຄາບ. ມີຜົນກັບຕາຕະລາງຂອງພາກຮຽນທີ່ກຳລັງເບິ່ງ (ວັນພຸດເຊົ້າ ໃຊ້ເວລາ ຄາບ 1-2 ຄືກັນ).
+          </div>
+          <div id="periodEditor"></div>
+          <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="savePeriods()">💾 ບັນທຶກເວລາຄາບ</button>
+          <button class="btn btn-ghost" style="width:100%;margin-top:6px" onclick="resetPeriods()">↺ ກັບຄ່າເລີ່ມຕົ້ນ</button>
+        </div>
+        <hr>
+        <div>
           <div class="section-lbl">📚 ເພີ່ມວິຊາ</div>
           <div class="field-row">
             <label>ລະຫັດ (ເຊັ່ນ 528 1206)</label>
@@ -124,6 +134,14 @@
           <button class="btn btn-primary" id="subFormBtn" style="width:100%;margin-top:4px" onclick="addSubject()">+ ເພີ່ມວິຊາ</button>
           <div id="subFormCancelWrap" style="display:none;margin-top:6px">
             <button class="btn btn-ghost" style="width:100%" onclick="cancelEditSubject()">ຍົກເລີກການແກ້ໄຂ</button>
+          </div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--border)">
+            <div class="field-row">
+              <label>📥 ດຶງລາຍວິຊາຈາກພາກຮຽນອື່ນ (ໃຊ້ຄືນ · ປະຢັດເວລາ)</label>
+              <select id="copySubFromTerm" style="width:100%;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;outline:none"></select>
+            </div>
+            <button class="btn btn-ghost" style="width:100%;margin-top:4px" onclick="importSubjectsFromTerm()">📥 ດຶງລາຍວິຊາມາໃສ່ພາກຮຽນນີ້</button>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6">ສຳເນົາສະເພາະ "ລາຍວິຊາ" (ບໍ່ລວມຕາຕະລາງ) — ວິຊາທີ່ມີຢູ່ແລ້ວຈະຖືກຂ້າມ.</div>
           </div>
         </div>
         <div>
@@ -364,20 +382,49 @@ const COLORS = [
 ];
 
 // ບັນຊີຜູ້ເບິ່ງ (read-only). admin ໃຊ້ Google login ແທນ.
-// PERIOD TIME DEFINITIONS (from PDF)
-// Mon/Tue/Thu/Fri: 5 periods | Wed: 3 blocks (different times)
-const PERIOD_TIMES_STD = [
+// PERIOD TIME DEFINITIONS (from PDF) — ແກ້ໄຂໄດ້ໂດຍ admin, ເກັບແຍກຕາມພາກຮຽນ
+// Mon/Tue/Thu/Fri: 5 periods | Wed: 2 morning blocks + ອອກແຮງງານລວມ
+const DEFAULT_PERIOD_TIMES_STD = [
   {num:1, start:'08:00', end:'09:30'},
   {num:2, start:'09:40', end:'11:10'},
   {num:3, start:'12:00', end:'13:30'},
   {num:4, start:'13:40', end:'15:10'},
   {num:5, start:'15:20', end:'16:50'},
 ];
-const PERIOD_TIMES_WED = [
-  {num:1, start:'08:00', end:'09:30'},
-  {num:2, start:'09:40', end:'11:10'},
-];
-const WED_LABOR_TIME = {start:'13:00', end:'15:30'};
+const DEFAULT_WED_LABOR_TIME = {start:'13:00', end:'15:30'};
+// state ປັດຈຸບັນ (let — ປ່ຽນໄດ້); ວັນພຸດເຊົ້າ (ຄາບ 1-2) ຕາມ STD 1-2
+let PERIOD_TIMES_STD = DEFAULT_PERIOD_TIMES_STD.map(p=>({...p}));
+let PERIOD_TIMES_WED = [];
+let WED_LABOR_TIME   = {...DEFAULT_WED_LABOR_TIME};
+
+// ສ້າງຄາບເຊົ້າວັນພຸດ (1-2) ໃຫ້ຕາມ STD 1-2
+function syncWedPeriods(){
+  PERIOD_TIMES_WED = [
+    {num:1, start:PERIOD_TIMES_STD[0].start, end:PERIOD_TIMES_STD[0].end},
+    {num:2, start:PERIOD_TIMES_STD[1].start, end:PERIOD_TIMES_STD[1].end},
+  ];
+}
+// ນຳຄ່າເວລາຄາບທີ່ເກັບໄວ້ມາໃຊ້ (fallback = ຄ່າເລີ່ມຕົ້ນ)
+function applyPeriods(p){
+  if(p && Array.isArray(p.std) && p.std.length===DEFAULT_PERIOD_TIMES_STD.length){
+    PERIOD_TIMES_STD = p.std.map((x,i)=>({
+      num:i+1,
+      start:(x&&x.start)||DEFAULT_PERIOD_TIMES_STD[i].start,
+      end:(x&&x.end)||DEFAULT_PERIOD_TIMES_STD[i].end
+    }));
+  } else {
+    PERIOD_TIMES_STD = DEFAULT_PERIOD_TIMES_STD.map(p=>({...p}));
+  }
+  WED_LABOR_TIME = (p && p.wedLabor && p.wedLabor.start)
+    ? {start:p.wedLabor.start, end:p.wedLabor.end||DEFAULT_WED_LABOR_TIME.end}
+    : {...DEFAULT_WED_LABOR_TIME};
+  syncWedPeriods();
+}
+// ຄ່າປັດຈຸບັນ ສຳລັບເກັບລົງ server / localStorage
+function periodsPayload(){
+  return { std:PERIOD_TIMES_STD.map(p=>({...p})), wedLabor:{...WED_LABOR_TIME} };
+}
+syncWedPeriods();
 
 // ============================================================
 // STATE
@@ -498,9 +545,11 @@ async function loadTerm(id){
     schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester: row.label||'' };
     if(!schoolMeta.semester) schoolMeta.semester = row.label||'';
     syncTeachers();
+    applyPeriods(d.periods);
     saveLocal();
     buildColorGrid(); buildClassColorGrid(); rebuildTable();
     renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); renderMeta(); refreshTeacherUI();
+    renderPeriodEditor(); renderCopyTermOptions();
     setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)');
   }catch(e){
     // ອອບລາຍ → ໃຊ້ໄຟລ໌ສຳຮອງ data.js
@@ -553,8 +602,8 @@ async function createTerm(){
   if(!label || !label.trim()) return;
   const copy=confirm('ສຳເນົາ "ສາຂາ + ວິຊາ" ຈາກພາກຮຽນປັດຈຸບັນບໍ?\n(ຕາຕະລາງຈະວ່າງ ໃຫ້ຈັດໃໝ່)\n\nOK = ສຳເນົາ · Cancel = ເລີ່ມວ່າງລ້າ');
   const newData = copy
-    ? { subjects:subjects.map(s=>({...s})), schedule:{}, roomSchedule:{}, rooms:ROOMS.slice(), teachers:TEACHERS.slice(), classes:CLASSES.map(c=>({...c})), meta:{semester:label.trim()} }
-    : { subjects:[], schedule:{}, roomSchedule:{}, rooms:[], teachers:[], classes:null, meta:{semester:label.trim()} };
+    ? { subjects:subjects.map(s=>({...s})), schedule:{}, roomSchedule:{}, rooms:ROOMS.slice(), teachers:TEACHERS.slice(), classes:CLASSES.map(c=>({...c})), meta:{semester:label.trim()}, periods:periodsPayload() }
+    : { subjects:[], schedule:{}, roomSchedule:{}, rooms:[], teachers:[], classes:null, meta:{semester:label.trim()}, periods:periodsPayload() };
   const id='t-'+Date.now();
   try{
     setSyncStatus('☁️ ກຳລັງສ້າງ…','var(--text-muted)');
@@ -612,7 +661,7 @@ async function pushToServer(){
     const label = (schoolMeta&&schoolMeta.semester)||'';
     const { error } = await sb.from('terms').update({
       label,
-      data:{ subjects, schedule, roomSchedule, rooms:ROOMS, teachers:TEACHERS, classes:CLASSES, meta:schoolMeta },
+      data:{ subjects, schedule, roomSchedule, rooms:ROOMS, teachers:TEACHERS, classes:CLASSES, meta:schoolMeta, periods:periodsPayload() },
       version:newVersion,
       updated_at:new Date().toISOString()
     }).eq('id',currentTermId);
@@ -716,6 +765,7 @@ function startApp(role, chipLabel){
   renderClassList();
   renderMeta();
   refreshTeacherUI();
+  renderPeriodEditor();
   // ໂຫລດລາຍຊື່ພາກຮຽນ + ພາກຮຽນທີ່ເລືອກ ຈາກ server
   loadTerms();
   // ຜູ້ເບິ່ງ (ບໍ່ແມ່ນ admin) ດຶງຂໍ້ມູນໃໝ່ທຸກ 45 ວິນາທີ ໂດຍບໍ່ຕ້ອງ refresh
@@ -952,6 +1002,99 @@ function renderTeacherList(){
   });
 }
 function refreshTeacherUI(){ buildTeacherFilter(); renderTeacherList(); }
+
+// ============================================================
+// ເວລາຄາບຮຽນ (admin ແກ້ໄຂໄດ້)
+// ============================================================
+function renderPeriodEditor(){
+  const el=document.getElementById('periodEditor');
+  if(!el) return;
+  const inStyle="flex:1;min-width:0;background:var(--panel);border:1.5px solid var(--border);color:var(--text);border-radius:6px;padding:5px 6px;font-family:inherit;font-size:12px;outline:none;color-scheme:dark";
+  let html='';
+  PERIOD_TIMES_STD.forEach((p,i)=>{
+    html+=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+      <span style="font-size:11px;color:var(--text-muted);width:44px;flex-shrink:0">ຄາບ ${p.num}</span>
+      <input type="time" id="pstart${i}" value="${p.start}" style="${inStyle}">
+      <span style="color:var(--text-muted);flex-shrink:0">–</span>
+      <input type="time" id="pend${i}" value="${p.end}" style="${inStyle}">
+    </div>`;
+  });
+  html+=`<div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">
+      <span style="font-size:10px;color:#43e97b;width:44px;flex-shrink:0">💪 ອອກແຮງ</span>
+      <input type="time" id="plaborStart" value="${WED_LABOR_TIME.start}" style="${inStyle}">
+      <span style="color:var(--text-muted);flex-shrink:0">–</span>
+      <input type="time" id="plaborEnd" value="${WED_LABOR_TIME.end}" style="${inStyle}">
+    </div>`;
+  el.innerHTML=html;
+}
+function savePeriods(){
+  if(currentRole!=='admin'){ alert('ຕ້ອງ login admin ກ່ອນ'); return; }
+  const std=[];
+  for(let i=0;i<PERIOD_TIMES_STD.length;i++){
+    const s=(document.getElementById('pstart'+i)||{}).value || PERIOD_TIMES_STD[i].start;
+    const e=(document.getElementById('pend'+i)||{}).value   || PERIOD_TIMES_STD[i].end;
+    std.push({num:i+1, start:s, end:e});
+  }
+  const labor={
+    start:(document.getElementById('plaborStart')||{}).value || WED_LABOR_TIME.start,
+    end:(document.getElementById('plaborEnd')||{}).value     || WED_LABOR_TIME.end
+  };
+  applyPeriods({ std, wedLabor:labor });
+  rebuildTable(); renderPeriodEditor(); saveData();
+  setSyncStatus('☁️ ບັນທຶກເວລາຄາບແລ້ວ','var(--accent3)');
+}
+function resetPeriods(){
+  if(currentRole!=='admin'){ alert('ຕ້ອງ login admin ກ່ອນ'); return; }
+  if(!confirm('ກັບໄປໃຊ້ເວລາຄາບເລີ່ມຕົ້ນ?')) return;
+  applyPeriods(null);
+  rebuildTable(); renderPeriodEditor(); saveData();
+}
+
+// ============================================================
+// ດຶງລາຍວິຊາ ຈາກພາກຮຽນອື່ນ (ໃຊ້ຄືນ ປະຢັດເວລາ)
+// ============================================================
+function renderCopyTermOptions(){
+  const sel=document.getElementById('copySubFromTerm');
+  if(!sel) return;
+  const others=terms.filter(t=>t.id!==currentTermId);
+  if(!others.length){ sel.innerHTML='<option value="">— ບໍ່ມີພາກຮຽນອື່ນ —</option>'; return; }
+  sel.innerHTML='<option value="">— ເລືອກພາກຮຽນຕົ້ນທາງ —</option>'
+    + others.map(t=>`<option value="${t.id}">${t.label}</option>`).join('');
+}
+async function importSubjectsFromTerm(){
+  if(currentRole!=='admin'){ alert('ຕ້ອງ login admin ກ່ອນ'); return; }
+  const sel=document.getElementById('copySubFromTerm');
+  const fromId=sel ? sel.value : '';
+  if(!fromId){ alert('ກະລຸນາເລືອກພາກຮຽນຕົ້ນທາງກ່ອນ'); return; }
+  if(fromId===currentTermId){ alert('ນີ້ແມ່ນພາກຮຽນປັດຈຸບັນ — ເລືອກພາກຮຽນອື່ນ'); return; }
+  try{
+    setSyncStatus('☁️ ກຳລັງດຶງລາຍວິຊາ…','var(--text-muted)');
+    const { data:row, error } = await sb.from('terms').select('data,label').eq('id',fromId).single();
+    if(error) throw error;
+    const src=(row.data && Array.isArray(row.data.subjects)) ? row.data.subjects : [];
+    if(!src.length){ alert('ພາກຮຽນນັ້ນຍັງບໍ່ມີວິຊາ'); setSyncStatus('☁️ ຊິ້ງຄ໌ແລ້ວ','var(--accent3)'); return; }
+    // merge — ຂ້າມວິຊາທີ່ມີຢູ່ແລ້ວ (ກວດດ້ວຍ ລະຫັດ+ຊື່)
+    const keyOf=s=>((s.code||'')+'|'+(s.name||'')).trim().toLowerCase();
+    const existing=new Set(subjects.map(keyOf));
+    let added=0, nextId=Date.now();
+    src.forEach(s=>{
+      if(existing.has(keyOf(s))) return;
+      subjects.push({
+        id:(++nextId), code:s.code||'', name:s.name||'', room:s.room||'',
+        teacher:s.teacher||'', credit:(s.credit!=null?s.credit:null), color:s.color||COLORS[0]
+      });
+      existing.add(keyOf(s));
+      added++;
+    });
+    renderSubjectList(); renderCells(); refreshTeacherUI(); saveData();
+    const skipped=src.length-added;
+    alert('ດຶງລາຍວິຊາສຳເລັດ!\nເພີ່ມ '+added+' ວິຊາ ຈາກ "'+(row.label||'')+'"'+(skipped>0?('\nຂ້າມ '+skipped+' ວິຊາທີ່ມີຢູ່ແລ້ວ'):''));
+    if(sel) sel.value='';
+  }catch(e){
+    setSyncStatus('⚠️ ດຶງບໍ່ສຳເລັດ','var(--accent2)');
+    alert('ດຶງລາຍວິຊາບໍ່ສຳເລັດ: '+(e.message||e));
+  }
+}
 
 // ============================================================
 // ROOM (ຫ້ອງຮຽນ) MANAGEMENT + ກວດທັບຊ້ອນ
@@ -1636,6 +1779,7 @@ function saveLocal(){
     localStorage.setItem('snu_teachers', JSON.stringify(TEACHERS));
     localStorage.setItem('snu_classes',  JSON.stringify(CLASSES));
     localStorage.setItem('snu_meta',     JSON.stringify(schoolMeta));
+    localStorage.setItem('snu_periods',  JSON.stringify(periodsPayload()));
   }catch(e){}
 }
 // ບັນທຶກລົງເຄື່ອງ + ດັນຂຶ້ນ server (admin) ໃຫ້ທຸກຄົນເຫັນ
@@ -1658,6 +1802,7 @@ function applyTermData(d){
   if(Array.isArray(d.classes)) CLASSES = d.classes.map(c=>({...c}));
   schoolMeta = (d.meta&&typeof d.meta==='object') ? {...d.meta} : { semester:'' };
   syncTeachers();
+  applyPeriods(d.periods);
 }
 // ໂຫລດ 1 ພາກຮຽນຈາກໄຟລ໌ສຳຮອງ (ໃຊ້ຕອນ Supabase ອອບລາຍ)
 function loadTermOffline(id){
@@ -1668,7 +1813,7 @@ function loadTermOffline(id){
   if(!schoolMeta.semester) schoolMeta.semester = t.label||'';
   saveLocal();
   buildColorGrid(); buildClassColorGrid(); rebuildTable();
-  renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); renderMeta();
+  renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); renderMeta(); renderPeriodEditor(); renderCopyTermOptions();
 }
 
 // ໂຫລດເບື້ອງຕົ້ນ (offline first paint): ໃຊ້ cache ລ່າສຸດ ຫຼື ພາກຮຽນປັດຈຸບັນຈາກໄຟລ໌
@@ -1681,6 +1826,7 @@ function loadData(){
     const tch =localStorage.getItem('snu_teachers');
     const cls =localStorage.getItem('snu_classes');
     const mta =localStorage.getItem('snu_meta');
+    const per =localStorage.getItem('snu_periods');
     if(subs||sch){
       if(subs) subjects=JSON.parse(subs);
       if(sch)  schedule=JSON.parse(sch);
@@ -1690,6 +1836,7 @@ function loadData(){
       if(cls)  CLASSES=JSON.parse(cls);
       if(mta)  schoolMeta=JSON.parse(mta);
       syncTeachers();
+      if(per)  applyPeriods(JSON.parse(per));
     } else {
       const sts=seedTerms();
       const cur=sts.find(t=>t.is_current)||sts[0];
@@ -1703,7 +1850,7 @@ function loadData(){
 // ============================================================
 function exportJSON(){
   saveData();
-  const blob=new Blob([JSON.stringify({subjects,schedule,roomSchedule,rooms:ROOMS,teachers:TEACHERS,classes:CLASSES,meta:schoolMeta},null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify({subjects,schedule,roomSchedule,rooms:ROOMS,teachers:TEACHERS,classes:CLASSES,meta:schoolMeta,periods:periodsPayload()},null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='timetable-snu.json';a.click();
 }
 function importClick(){document.getElementById('importFile').click();}
@@ -1721,7 +1868,8 @@ function importJSON(e){
       if(data.classes)  CLASSES=data.classes;
       if(data.meta)     schoolMeta=data.meta;
       syncTeachers();
-      renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); rebuildTable(); renderMeta(); saveData();
+      if(data.periods)  applyPeriods(data.periods);
+      renderSubjectList(); renderRoomList(); renderTeacherMgmt(); renderClassList(); rebuildTable(); renderMeta(); renderPeriodEditor(); saveData();
       alert('ນຳເຂົ້າສຳເລັດ!');
     }catch{alert('ໄຟລ໌ JSON ບໍ່ຖືກຕ້ອງ');}
   };
