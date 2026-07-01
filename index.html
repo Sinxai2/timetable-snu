@@ -294,9 +294,10 @@
   <div class="modal">
     <div class="modal-title" id="modalTitle"></div>
     <div class="modal-sub" id="modalSub"></div>
-    <div id="modalRoomWrap" style="display:flex;align-items:center;gap:8px;margin:6px 0 10px">
+    <div id="modalRoomWrap" style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--text-muted);white-space:nowrap">🚪 ຫ້ອງຮຽນ:</span>
-      <select id="modalRoom" style="flex:1;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none"></select>
+      <select id="modalRoom" style="flex:1;min-width:120px;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;font-weight:600;outline:none"></select>
+      <button id="confirmRoomBtn" class="btn btn-primary" style="white-space:nowrap;padding:7px 12px;font-size:12px" onclick="confirmRoomChange()">✓ ປ່ຽນຫ້ອງ</button>
     </div>
     <input id="modalSubjectSearch" oninput="renderModalSubjects()" placeholder="🔍 ຄົ້ນຫາຊື່ອາຈານ / ວິຊາ" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-family:'Noto Sans Lao',sans-serif;font-size:12px;outline:none;margin-bottom:8px">
     <div class="sub-opts" id="modalBody"></div>
@@ -1694,6 +1695,9 @@ function openModal(key, dayLabel, clsId, periodNum){
     if(cur && !ROOMS.some(r=>r===cur)){ const o=document.createElement('option'); o.value=cur; o.textContent=cur+' (ນອກລາຍຊື່)'; roomSel.appendChild(o); }
     roomSel.value=cur;
   }
+  // ปุ่ม "ปเปลี่ยนห้อง" — ໃຫ້ໃຊ້ໄດ້ສະเฉพาะช่องที่มีวิชาแล้ว
+  const crb=document.getElementById('confirmRoomBtn');
+  if(crb) crb.style.display = (schedule[key]!==undefined) ? '' : 'none';
   const body=document.getElementById('modalBody');
   // reset ຊ່ອງຄົ້ນຫາ + render ລາຍການວິຊາ (ກອງຕາມຄຳຄົ້ນຫາ)
   const ss=document.getElementById('modalSubjectSearch'); if(ss) ss.value='';
@@ -1749,6 +1753,27 @@ function selectSubject(id){
     }
   }
   schedule[activeCell]=id;
+  if(chosenRoom) roomSchedule[activeCell]=chosenRoom; else delete roomSchedule[activeCell];
+  renderCells(); renderRoomList(); saveData();
+  document.getElementById('overlay').classList.remove('open');
+}
+// ປ່ຽນສະเฉพาะ "ຫ້ອງ" ຂອງຊ່ອງນີ້ (ບໍ່ຕ້ອງເລືອກວິຊາໃໝ່) — ກົດຢືนยันจากปุ่ม ✓ ປ່ຽນຫ້ອງ
+function confirmRoomChange(){
+  if(!activeCell||currentRole!=='admin')return;
+  const sid=schedule[activeCell];
+  if(sid===undefined){ alert('ຊ່ອງນີ້ຍັງບໍ່ມີວິຊາ — ກະລຸນາເລືອກວິຊາກ່ອນ'); return; }
+  const roomSel=document.getElementById('modalRoom');
+  const chosenRoom=roomSel ? roomSel.value.trim() : '';
+  const sub=subjects.find(s=>s.id===sid);
+  const effRoom=chosenRoom || (sub && sub.room ? String(sub.room).trim() : '');
+  // ກວດການທັບຊ້ອນຫ້ອງກ່ອນປ່ຽນ
+  if(effRoom){
+    const conflicts=roomConflicts(activeCell, effRoom);
+    if(conflicts.length){
+      const lines=conflicts.map(k=>'• '+cellDesc(k)).join('\n');
+      if(!confirm(`⚠️ ຫ້ອງ "${effRoom}" ຖືກໃຊ້ຢູ່ແລ້ວ ໃນວັນ/ຄາບດຽວກັນ:\n${lines}\n\nຍັງຕ້ອງການປ່ຽນຫ້ອງນີ້ຢູ່ບໍ?`)) return;
+    }
+  }
   if(chosenRoom) roomSchedule[activeCell]=chosenRoom; else delete roomSchedule[activeCell];
   renderCells(); renderRoomList(); saveData();
   document.getElementById('overlay').classList.remove('open');
